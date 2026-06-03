@@ -16,6 +16,7 @@
 		"ios:open": "cap open ios"
 	},
 	"devDependencies": {
+		"@capacitor/assets": "^3.0.5",
 		"@capacitor/cli": "^8.4.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-static": "^3.0.10",
