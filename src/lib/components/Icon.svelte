@@ -6,8 +6,9 @@
 		size = 20,
 		sw = 1.9,
 		color = 'currentColor',
-		fill = 'none'
-	}: { name: IconName; size?: number; sw?: number; color?: string; fill?: string } = $props();
+		fill = 'none',
+		style = ''
+	}: { name: IconName; size?: number; sw?: number; color?: string; fill?: string; style?: string } = $props();
 
 	const solid = $derived(SOLID_ICONS.has(name));
 </script>
@@ -16,7 +17,7 @@
 	width={size}
 	height={size}
 	viewBox="0 0 24 24"
-	style="display:block;flex:0 0 auto"
+	style="display:block;flex:0 0 auto;{style}"
 	fill={solid ? color : fill}
 	stroke={solid ? 'none' : color}
 	stroke-width={sw}

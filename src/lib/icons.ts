@@ -36,7 +36,18 @@ export const ICONS = {
 	cal: 'M4 7h16v13H4zM4 7V5h16v2M8 3v4M16 3v4',
 	bolt: 'M13 3L5 13h6l-1 8 8-10h-6z',
 	arrowR: 'M5 12h14M13 6l6 6-6 6',
-	arrowD: 'M12 5v14M6 13l6 6 6-6'
+	arrowD: 'M12 5v14M6 13l6 6 6-6',
+	arrowU: 'M12 19V5M6 11l6-6 6 6',
+	chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+	trend: 'M3 17l5-6 4 3 6-8M21 6h-4M21 6v4',
+	trophy: 'M7 4h10v4a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M9 16h6M8 20h8M12 16v4',
+	download: 'M12 4v10M8 11l4 4 4-4M5 19h14',
+	upload: 'M12 20V10M8 13l4-4 4 4M5 5h14',
+	shield: 'M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6z',
+	swap: 'M7 8h13M7 8l3-3M7 8l3 3M17 16H4M17 16l-3-3M17 16l-3 3',
+	fire: 'M12 3c1 3-2 4-2 7a4 4 0 0 0 8 0c0-3-3-4-2-7M12 21a5 5 0 0 0 5-5',
+	alert: 'M12 8v5M12 16v.5M10.3 4l-7 12a1.5 1.5 0 0 0 1.3 2.3h14.8a1.5 1.5 0 0 0 1.3-2.3l-7-12a1.5 1.5 0 0 0-2.6 0z',
+	doc: 'M6 3h8l4 4v14H6zM14 3v4h4'
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -84,4 +84,8 @@ export class DexieRepository implements Repository {
 	async saveSettings(s: Settings) {
 		await this.db.settings.put({ ...s, id: SETTINGS_KEY });
 	}
+
+	async clearAll() {
+		await Promise.all([this.db.exercises.clear(), this.db.templates.clear(), this.db.sessions.clear()]);
+	}
 }

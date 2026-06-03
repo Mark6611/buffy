@@ -3,24 +3,29 @@
 	import { goto } from '$app/navigation';
 	import { ensureSeeded, getRepository } from '$lib/db';
 	import { templateDerived } from '$lib/compute';
-	import { durationLabel } from '$lib/format';
-	import type { Template, Exercise } from '$lib/types';
+	import { durationLabel, volK } from '$lib/format';
+	import { kpis } from '$lib/analytics';
+	import type { Template, Exercise, WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import EqChip from '$lib/components/EqChip.svelte';
 
 	let templates = $state<Template[]>([]);
+	let sessions = $state<WorkoutSession[]>([]);
 	let byId = $state<Map<string, Exercise>>(new Map());
 	let loaded = $state(false);
 
 	onMount(async () => {
 		await ensureSeeded();
 		const repo = getRepository();
-		const [t, ex] = await Promise.all([repo.listTemplates(), repo.listExercises()]);
+		const [t, ex, s] = await Promise.all([repo.listTemplates(), repo.listExercises(), repo.listSessions()]);
 		templates = t;
+		sessions = s;
 		byId = new Map(ex.map((e) => [e.id, e]));
 		loaded = true;
 	});
+
+	const k = $derived(kpis(sessions));
 
 	const dateLabel = new Date().toLocaleDateString('en-US', {
 		weekday: 'long',
@@ -37,6 +42,9 @@
 				<div class="h-app" style="font-size:28px">Workouts</div>
 			</div>
 			<div style="display:flex;gap:8px">
+				<button class="icon-btn" onclick={() => goto('/trends')} aria-label="Trends">
+					<Icon name="chart" size={18} />
+				</button>
 				<button class="icon-btn" onclick={() => goto('/history')} aria-label="History">
 					<Icon name="cal" size={18} />
 				</button>
@@ -58,6 +66,28 @@
 				<Icon name="arrowR" size={18} color="#fff" />
 			</button>
 		</div>
+
+		{#if sessions.length}
+			<div class="pad" style="margin-bottom:18px">
+				<button
+					class="card card-pad"
+					style="display:flex;align-items:center;gap:13px;width:100%;text-align:left"
+					onclick={() => goto('/trends')}
+				>
+					<span class="stat-ic" style="width:38px;height:38px;background:var(--accent-tint)">
+						<Icon name="trend" size={19} color="var(--accent-ink)" />
+					</span>
+					<div style="flex:1;min-width:0">
+						<div style="font-size:13px;font-weight:600">This week</div>
+						<div class="txt-sm mono" style="margin-top:2px">
+							{k.sessionsThisWeek} sessions · {volK(k.volThisWeek)} kg{#if k.streakDays > 0}
+								· <span style="color:var(--accent-ink)">🔥 {k.streakDays}-day streak</span>{/if}
+						</div>
+					</div>
+					<span class="chip" style="font-size:11px">Trends<Icon name="chevR" size={13} /></span>
+				</button>
+			</div>
+		{/if}
 
 		<div
 			class="pad"

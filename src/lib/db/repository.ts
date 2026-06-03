@@ -33,4 +33,7 @@ export interface Repository {
 	// --- settings (singleton) ---
 	getSettings(): Promise<Settings>;
 	saveSettings(s: Settings): Promise<void>;
+
+	/** wipe all exercises, templates and sessions (used by restore → replace) */
+	clearAll(): Promise<void>;
 }

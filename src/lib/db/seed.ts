@@ -142,37 +142,6 @@ function buildTemplates(iso: string): Template[] {
 }
 
 // ---- Sessions (history) -----------------------------------------------------
-type Row = [rest: string, reps: number, weight?: number];
-
-function loggedFromRows(exerciseId: ID, rows: Row[], perSide: boolean, groupId?: ID, setupNote?: string): LoggedExercise {
-	const sets: LoggedSet[] = rows.map((r, i) => ({
-		index: i,
-		completed: true,
-		reps: r[1],
-		weight: r[2],
-		perSide: r[2] != null ? perSide : undefined,
-		restTakenSec: parseMmss(r[0])
-	}));
-	return { exerciseId, groupId: groupId ?? null, setupNote, sets };
-}
-
-/** Build a logged session straight from a template's planned sets (all completed at target). */
-function loggedFromTemplate(t: Template): LoggedExercise[] {
-	return t.exercises.map((tex) => ({
-		exerciseId: tex.exerciseId,
-		groupId: tex.groupId ?? null,
-		setupNote: tex.setupNote,
-		sets: tex.plannedSets.map((ps, i) => ({
-			index: i,
-			completed: true,
-			reps: ps.targetReps,
-			weight: ps.targetWeight,
-			durationSec: ps.targetDurationSec,
-			perSide: ps.targetWeight != null ? isPerSide(tex.exerciseId) : undefined,
-			restTakenSec: ps.targetRestSec
-		}))
-	}));
-}
 const PER_SIDE_IDS = new Set(['fly-high', 'fly-low', 'bicep-curl', 'shoulder-press']);
 function isPerSide(id: ID): boolean {
 	return PER_SIDE_IDS.has(id);
@@ -182,47 +151,53 @@ function daysAgoIso(now: number, days: number, plusMin = 0): string {
 	return new Date(now - days * 86_400_000 + plusMin * 60_000).toISOString();
 }
 
-function buildSessions(now: number, templates: Template[]): WorkoutSession[] {
-	const byId = new Map(templates.map((t) => [t.id, t]));
+/** Logged exercises from a template's planned sets, with progressive overload applied. */
+function loggedProgression(t: Template, bumps: number, exById: Map<string, Exercise>): LoggedExercise[] {
+	return t.exercises.map((tex) => {
+		const ex = exById.get(tex.exerciseId);
+		const step = ex?.weightStep ?? 2.5;
+		return {
+			exerciseId: tex.exerciseId,
+			groupId: tex.groupId ?? null,
+			setupNote: tex.setupNote,
+			sets: tex.plannedSets.map((ps, i) => ({
+				index: i,
+				completed: true,
+				reps: ps.targetReps,
+				weight: ps.targetWeight != null ? Math.round((ps.targetWeight + step * bumps) * 10) / 10 : undefined,
+				durationSec: ps.targetDurationSec != null ? ps.targetDurationSec + bumps * 3 : undefined,
+				perSide: ps.targetWeight != null ? isPerSide(tex.exerciseId) : undefined,
+				restTakenSec: ps.targetRestSec
+			}))
+		};
+	});
+}
 
-	// 1) Chest Tricep — full actuals from the reference logs (powers auto-progression)
-	const chest: WorkoutSession = {
-		id: 'sess-chest-1',
-		startedAt: daysAgoIso(now, 5),
-		endedAt: daysAgoIso(now, 5, 47),
-		sourceTemplateId: 'chest-tricep',
-		title: 'Chest Tricep',
-		note: 'Felt strong — PR on incline. Cable height ok.',
-		exercises: [
-			loggedFromRows('inc-bench', [['—', 13, 20], ['01:00', 8, 40], ['01:45', 8, 40], ['01:15', 8, 40]], false),
-			loggedFromRows('fly-high', [['—', 12, 12.5], ['00:59', 11, 12.5], ['00:59', 11, 12.5], ['01:00', 12, 12.5]], true, 'ss1', 'Fly High 16/18'),
-			loggedFromRows('fly-low', [['00:59', 13, 3.7], ['00:55', 10, 5.7], ['01:00', 10, 5.7], ['01:00', 9, 5.7]], true, 'ss1', 'Low Fly 4'),
-			loggedFromRows('chest-press', [['06:00', 12, 40], ['04:30', 8, 40], ['—', 11, 40], ['01:30', 11, 40]], false),
-			loggedFromRows('tricep-pushdown', [['04:59', 10, 14.7], ['00:59', 10, 17], ['01:09', 8, 17], ['00:45', 8, 7.9]], false)
-		]
-	};
-
-	// 2) Back Bicep — at target
-	const back: WorkoutSession = {
-		id: 'sess-back-1',
-		startedAt: daysAgoIso(now, 2),
-		endedAt: daysAgoIso(now, 2, 32),
-		sourceTemplateId: 'back-bicep',
-		title: 'Back Bicep',
-		exercises: loggedFromTemplate(byId.get('back-bicep')!)
-	};
-
-	// 3) Legs — at target, last week
-	const legs: WorkoutSession = {
-		id: 'sess-legs-1',
-		startedAt: daysAgoIso(now, 8),
-		endedAt: daysAgoIso(now, 8, 72),
-		sourceTemplateId: 'legs',
-		title: 'Legs',
-		exercises: loggedFromTemplate(byId.get('legs')!)
-	};
-
-	return [chest, back, legs];
+/** ~12 weeks of history — 3 sessions/week cycling the four templates, weights climbing over time. */
+function buildSessions(now: number, templates: Template[], exById: Map<string, Exercise>): WorkoutSession[] {
+	const tplById = new Map(templates.map((t) => [t.id, t]));
+	const order = ['chest-tricep', 'back-bicep', 'shoulder-core', 'legs'];
+	const dayOffsets = [2, 4, 6]; // three days within each week
+	const sessions: WorkoutSession[] = [];
+	let idx = 0;
+	for (let w = 11; w >= 0; w--) {
+		for (const off of dayOffsets) {
+			const tpl = tplById.get(order[idx % order.length]);
+			idx++;
+			if (!tpl) continue;
+			const daysAgo = w * 7 + (7 - off);
+			const bumps = Math.floor((11 - w) / 3); // climbs 0 → 3 across the window
+			sessions.push({
+				id: `sess-${tpl.id}-w${w}-d${off}`,
+				startedAt: daysAgoIso(now, daysAgo),
+				endedAt: daysAgoIso(now, daysAgo, 45),
+				sourceTemplateId: tpl.id,
+				title: tpl.name,
+				exercises: loggedProgression(tpl, bumps, exById)
+			});
+		}
+	}
+	return sessions;
 }
 
 // ---- Entry point ------------------------------------------------------------
@@ -237,5 +212,5 @@ export async function seedDatabase(repo: Repository): Promise<void> {
 	const templates = buildTemplates(iso);
 	for (const t of templates) await repo.upsertTemplate(t);
 
-	for (const s of buildSessions(now, templates)) await repo.upsertSession(s);
+	for (const s of buildSessions(now, templates, new Map(EXERCISES.map((e) => [e.id, e])))) await repo.upsertSession(s);
 }
