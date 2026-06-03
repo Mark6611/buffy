@@ -25,11 +25,24 @@
 	}
 
 	async function doExportJSON() {
-		await exportJSON();
-		const now = new Date().toISOString();
-		localStorage.setItem('buffy:lastBackup', now);
-		lastBackup = now;
-		message = 'Backup downloaded.';
+		try {
+			await exportJSON();
+			const now = new Date().toISOString();
+			localStorage.setItem('buffy:lastBackup', now);
+			lastBackup = now;
+			message = 'Backup exported.';
+		} catch (e) {
+			message = e instanceof Error ? e.message : 'Export failed.';
+		}
+	}
+
+	async function doExportCSV() {
+		try {
+			await exportCSV();
+			message = 'CSV exported.';
+		} catch (e) {
+			message = e instanceof Error ? e.message : 'Export failed.';
+		}
 	}
 
 	function pick(m: ImportMode) {
@@ -111,7 +124,7 @@
 							<Icon name="chart" size={19} color="var(--ink-2)" />
 							<div><div style="font-weight:500">Sessions · CSV</div><div class="txt-sm">one row per logged set · for spreadsheets</div></div>
 						</div>
-						<button class="btn btn-ghost btn-sm" style="height:38px" onclick={exportCSV}><Icon name="download" size={16} />CSV</button>
+						<button class="btn btn-ghost btn-sm" style="height:38px" onclick={doExportCSV}><Icon name="download" size={16} />CSV</button>
 					</div>
 				</div>
 			</div>

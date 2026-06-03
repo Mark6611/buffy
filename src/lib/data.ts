@@ -1,6 +1,7 @@
 // Backup / restore service — export & import all Buffy data via the repository.
 import { getRepository } from '$lib/db';
 import { setVolume } from '$lib/compute';
+import { saveTextFile } from '$lib/native';
 import type { Exercise, Template, WorkoutSession, Settings } from '$lib/types';
 
 export interface BuffyBackup {
@@ -19,14 +20,6 @@ function stamp(): string {
 	const d = new Date();
 	const p = (n: number) => String(n).padStart(2, '0');
 	return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
-}
-function download(content: string, filename: string, type: string) {
-	const url = URL.createObjectURL(new Blob([content], { type }));
-	const a = document.createElement('a');
-	a.href = url;
-	a.download = filename;
-	a.click();
-	URL.revokeObjectURL(url);
 }
 function csv(s: string): string {
 	return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -48,7 +41,7 @@ export async function buildBackup(): Promise<BuffyBackup> {
 
 export async function exportJSON() {
 	const data = await buildBackup();
-	download(JSON.stringify(data, null, 2), `buffy-backup-${stamp()}.json`, 'application/json');
+	await saveTextFile(`buffy-backup-${stamp()}.json`, JSON.stringify(data, null, 2), 'application/json');
 }
 
 export async function exportCSV() {
@@ -80,7 +73,7 @@ export async function exportCSV() {
 			});
 		}
 	}
-	download(rows.join('\n'), `buffy-sessions-${stamp()}.csv`, 'text/csv');
+	await saveTextFile(`buffy-sessions-${stamp()}.csv`, rows.join('\n'), 'text/csv');
 }
 
 /** Parse + validate a Buffy backup file. Throws on anything that isn't one. */

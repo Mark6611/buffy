@@ -40,3 +40,34 @@ export async function setupNativeChrome(): Promise<void> {
 		/* plugin may be absent */
 	}
 }
+
+/**
+ * Save a text file. On native (iOS) we write it to disk and open the share sheet
+ * (Save to Files, AirDrop, Mail…); on the web we trigger a normal download. The
+ * `<a download>` trick is a no-op inside a WebView, which is why this has to branch.
+ */
+export async function saveTextFile(filename: string, content: string, mimeType: string): Promise<void> {
+	if (isNative) {
+		const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+		const { Share } = await import('@capacitor/share');
+		const { uri } = await Filesystem.writeFile({
+			path: filename,
+			data: content,
+			directory: Directory.Cache,
+			encoding: Encoding.UTF8
+		});
+		try {
+			await Share.share({ title: filename, files: [uri], dialogTitle: 'Save or share your Buffy backup' });
+		} catch {
+			/* user dismissed the share sheet — the file is already written, nothing to do */
+		}
+		return;
+	}
+	// Web: blob + anchor download.
+	const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = filename;
+	a.click();
+	URL.revokeObjectURL(url);
+}
