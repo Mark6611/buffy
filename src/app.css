@@ -37,6 +37,9 @@
 
 * { box-sizing: border-box; }
 
+/* buttons inherit text color + font — iOS WKWebView otherwise tints button text blue */
+button { font: inherit; color: inherit; }
+
 html, body { height: 100%; }
 body {
   margin: 0;

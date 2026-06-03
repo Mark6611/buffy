@@ -12,7 +12,12 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
-		adapter: native ? adapterStatic({ fallback: 'index.html' }) : adapterVercel()
+		adapter: native ? adapterStatic({ fallback: 'index.html' }) : adapterVercel(),
+		serviceWorker: {
+			// the native app is fully bundled in the WebView — a service worker only
+			// interferes there (it can intercept chunk loads and blank the screen)
+			register: !native
+		}
 	}
 };
 
