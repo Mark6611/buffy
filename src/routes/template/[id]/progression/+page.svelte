@@ -4,7 +4,8 @@
 	import { onMount } from 'svelte';
 	import { getRepository } from '$lib/db';
 	import { settings } from '$lib/stores/settings.svelte';
-	import { workout, computeSuggestion, type Suggestion } from '$lib/stores/workout.svelte';
+	import { workout } from '$lib/stores/workout.svelte';
+	import { computeSuggestion, type Suggestion } from '$lib/progression';
 	import { kg } from '$lib/format';
 	import type { Template, Exercise } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';

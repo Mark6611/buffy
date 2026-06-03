@@ -46,12 +46,14 @@
 			defaultRestSec: restSec
 		};
 		await getRepository().upsertExercise(ex);
-		if (to === 'tpl') {
+		if (to === 'tpl' && editor.draft) {
 			editor.addExercise(ex);
-			goto(`/template/${editor.draft?.id}/edit`);
-		} else {
+			goto(`/template/${editor.draft.id}/edit`);
+		} else if (workout.active) {
 			workout.addExercise(ex);
 			goto('/workout');
+		} else {
+			goto('/'); // saved to the catalog; no active editor/workout to return to
 		}
 	}
 </script>

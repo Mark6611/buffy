@@ -12,6 +12,7 @@ class SettingsStore {
 	}
 
 	async save(patch: Partial<Settings>) {
+		if (!this.loaded) await this.load();
 		this.current = { ...this.current, ...patch };
 		await getRepository().saveSettings($state.snapshot(this.current));
 	}

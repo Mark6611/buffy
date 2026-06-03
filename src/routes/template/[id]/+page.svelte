@@ -87,7 +87,7 @@
 	<div class="screen-body">
 		{#if tpl && td}
 			<div class="pad">
-				<div class="hero" style="margin-bottom:16px">{id} · cover image</div>
+				<div class="hero" style="margin-bottom:16px"></div>
 				<h1 class="h-app" style="margin-bottom:14px">{tpl.name}</h1>
 
 				<div style="margin-bottom:8px">

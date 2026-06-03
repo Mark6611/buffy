@@ -18,7 +18,7 @@
 
 	async function finish() {
 		const id = await workout.finish();
-		goto(id ? `/history/${id}` : '/history');
+		goto(id ? `/history/${id}` : '/');
 	}
 	function close() {
 		if (confirm('Discard this workout? Nothing will be saved.')) {
@@ -35,7 +35,9 @@
 			<div style="text-align:center">
 				<div style="font-size:15px;font-weight:600;letter-spacing:-0.2px">{workout.session.title}</div>
 				<div class="mono txt-sm" style="margin-top:1px">
-					{mmss(workout.elapsedSec)} · {workout.activeEx + 1}/{workout.exerciseCount}
+					{mmss(workout.elapsedSec)} · {workout.exerciseCount
+						? `${workout.activeEx + 1}/${workout.exerciseCount}`
+						: 'no exercises'}
 				</div>
 			</div>
 			<button class="btn btn-accent btn-sm" style="height:36px;padding:0 14px" onclick={finish}>Finish</button>

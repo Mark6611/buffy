@@ -47,6 +47,14 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Prevent iOS Safari from zooming when a field is focused: force >=16px form
+   controls on phones. !important beats the 15px set-table inputs. */
+@media (max-width: 600px) {
+  input,
+  textarea,
+  select { font-size: 16px !important; }
+}
+
 /* The real app viewport: a centered phone-width column.
    On desktop it floats as a device; on a phone it fills the screen. */
 .app {
