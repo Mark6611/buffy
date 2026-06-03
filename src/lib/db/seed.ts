@@ -1,6 +1,6 @@
-// First-run seed: the real catalog, the four templates, and a few logged sessions
-// (so history, KPIs, and auto-progression "last time" anchors have real data).
-// Values echo the reference screenshots. Seeding is idempotent (skips if non-empty).
+// First-run seed: the real catalog, the four templates, and ~12 weeks of generated
+// session history (so history, KPIs, trends, and auto-progression have real data).
+// Seeding is idempotent (skips if non-empty).
 import type {
 	Exercise,
 	Template,
@@ -8,12 +8,10 @@ import type {
 	PlannedSet,
 	WorkoutSession,
 	LoggedExercise,
-	LoggedSet,
 	Settings,
 	ID
 } from '$lib/types';
 import type { Repository } from './repository';
-import { parseMmss } from '$lib/format';
 
 export const DEFAULT_SETTINGS: Settings = {
 	defaultRestSec: 90,
