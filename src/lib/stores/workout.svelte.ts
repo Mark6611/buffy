@@ -6,6 +6,7 @@ import { getRepository } from '$lib/db';
 import type { Exercise, LoggedExercise, LoggedSet, WorkoutSession } from '$lib/types';
 import { settings } from './settings.svelte';
 import { computeSuggestion, type Suggestion } from '$lib/progression';
+import { haptic } from '$lib/native';
 
 function newId(): string {
 	return crypto.randomUUID();
@@ -50,7 +51,13 @@ class WorkoutStore {
 		if (this.interval) return;
 		this.interval = setInterval(() => {
 			this.nowMs = Date.now();
-			if (this.restRunning) this.restElapsedSec += 1;
+			if (this.restRunning) {
+				const wasOver = this.restElapsedSec >= this.restSeedSec;
+				this.restElapsedSec += 1;
+				if (!wasOver && this.restElapsedSec >= this.restSeedSec && settings.current.hapticAtRestEnd) {
+					haptic('heavy'); // rest hit zero — native buzz on iOS; on-screen cue everywhere
+				}
+			}
 		}, 1000);
 	}
 	private stopInterval() {

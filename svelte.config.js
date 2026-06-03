@@ -1,4 +1,9 @@
-import adapter from '@sveltejs/adapter-vercel';
+import adapterVercel from '@sveltejs/adapter-vercel';
+import adapterStatic from '@sveltejs/adapter-static';
+
+// Web (Vercel) ships with adapter-vercel. The Capacitor / iOS build uses adapter-static
+// — a self-contained SPA in build/ that Capacitor wraps. Select with BUILD_TARGET=capacitor.
+const native = process.env.BUILD_TARGET === 'capacitor';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -7,10 +12,7 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
-		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-		adapter: adapter()
+		adapter: native ? adapterStatic({ fallback: 'index.html' }) : adapterVercel()
 	}
 };
 
