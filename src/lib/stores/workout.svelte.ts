@@ -12,6 +12,25 @@ function newId(): string {
 	return crypto.randomUUID();
 }
 
+// In-progress workouts are persisted here so a backgrounded or killed app (iOS
+// purges the WebView under memory pressure) resumes exactly where it left off,
+// timers included. This is transient, device-local resume state — not a domain
+// record (sessions only reach the repository on finish()) — so localStorage is
+// the right store and the repository boundary doesn't apply.
+const RESUME_KEY = 'buffy:activeWorkout';
+
+interface ResumeSnapshot {
+	session: WorkoutSession;
+	plannedRest: number[][];
+	activeEx: number;
+	activeSet: number;
+	restRunning: boolean;
+	restSeedSec: number;
+	restForSet: { ex: number; set: number } | null;
+	restStartedAtMs: number;
+	restAccumSec: number;
+}
+
 class WorkoutStore {
 	session = $state<WorkoutSession | null>(null);
 	meta = $state<Exercise[]>([]); // parallel to session.exercises
@@ -21,17 +40,65 @@ class WorkoutStore {
 	activeEx = $state(0);
 	activeSet = $state(0);
 
-	// rest timer
+	// Rest timer — wall-clock based. Elapsed is DERIVED from timestamps (see the
+	// restElapsedSec getter), never incremented tick-by-tick, so it stays correct
+	// across app backgrounding (the WebView's JS timers freeze when suspended).
 	restRunning = $state(false);
 	restSeedSec = $state(0);
-	restElapsedSec = $state(0);
 	restForSet = $state<{ ex: number; set: number } | null>(null);
+	restStartedAtMs = $state(0); // when the current running rest segment began
+	restAccumSec = $state(0); // rest banked from earlier segments (before pauses)
+	private restHapticFired = false;
 
 	nowMs = $state(Date.now());
 	private interval: ReturnType<typeof setInterval> | null = null;
 
+	constructor() {
+		if (typeof document !== 'undefined') {
+			// Returning to the foreground: refresh the clock immediately so both
+			// timers jump to the real elapsed time instead of waiting for the next
+			// tick (and the interval, which iOS suspended, resumes on its own).
+			document.addEventListener('visibilitychange', () => {
+				if (document.visibilityState === 'visible') this.nowMs = Date.now();
+			});
+		}
+		if (typeof window !== 'undefined') {
+			// Auto-persist on any change — including direct set edits (reps/weight
+			// inputs mutate the set object, not via a method). The deep snapshot read
+			// tracks every nested field; nowMs is deliberately NOT read here so we
+			// don't write every second. Removal is explicit (cancel) to avoid a
+			// startup race where the first run wipes a session before restore() reads.
+			$effect.root(() => {
+				$effect(() => {
+					if (!this.session) return;
+					const snap: ResumeSnapshot = {
+						session: $state.snapshot(this.session) as WorkoutSession,
+						plannedRest: $state.snapshot(this.plannedRest) as number[][],
+						activeEx: this.activeEx,
+						activeSet: this.activeSet,
+						restRunning: this.restRunning,
+						restSeedSec: this.restSeedSec,
+						restForSet: this.restForSet ? { ...this.restForSet } : null,
+						restStartedAtMs: this.restStartedAtMs,
+						restAccumSec: this.restAccumSec
+					};
+					try {
+						localStorage.setItem(RESUME_KEY, JSON.stringify(snap));
+					} catch {
+						/* storage unavailable — resume is best-effort */
+					}
+				});
+			});
+		}
+	}
+
 	get active(): boolean {
 		return this.session !== null;
+	}
+	get restElapsedSec(): number {
+		if (this.restForSet == null) return 0;
+		const running = this.restRunning ? (this.nowMs - this.restStartedAtMs) / 1000 : 0;
+		return Math.max(0, this.restAccumSec + running);
 	}
 	get restRemaining(): number {
 		return this.restSeedSec - this.restElapsedSec;
@@ -51,12 +118,15 @@ class WorkoutStore {
 		if (this.interval) return;
 		this.interval = setInterval(() => {
 			this.nowMs = Date.now();
-			if (this.restRunning) {
-				const wasOver = this.restElapsedSec >= this.restSeedSec;
-				this.restElapsedSec += 1;
-				if (!wasOver && this.restElapsedSec >= this.restSeedSec && settings.current.hapticAtRestEnd) {
-					haptic('heavy'); // rest hit zero — native buzz on iOS; on-screen cue everywhere
-				}
+			if (
+				this.restRunning &&
+				this.restForSet &&
+				!this.restHapticFired &&
+				this.restElapsedSec >= this.restSeedSec &&
+				settings.current.hapticAtRestEnd
+			) {
+				this.restHapticFired = true;
+				haptic('heavy'); // rest hit zero — native buzz on iOS; on-screen cue everywhere
 			}
 		}, 1000);
 	}
@@ -150,6 +220,64 @@ class WorkoutStore {
 		this.ensureInterval();
 	}
 
+	/** Resume an in-progress workout after an app restart / WebView purge. */
+	restore() {
+		if (this.session) return;
+		let snap: ResumeSnapshot | null = null;
+		try {
+			const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(RESUME_KEY) : null;
+			snap = raw ? (JSON.parse(raw) as ResumeSnapshot) : null;
+		} catch {
+			snap = null;
+		}
+		if (!snap?.session?.exercises?.length) return;
+
+		this.plannedRest = snap.plannedRest ?? [];
+		this.activeEx = snap.activeEx ?? 0;
+		this.activeSet = snap.activeSet ?? 0;
+		this.restSeedSec = snap.restSeedSec ?? 0;
+		this.restForSet = snap.restForSet ?? null;
+		this.restStartedAtMs = snap.restStartedAtMs ?? 0;
+		this.restAccumSec = snap.restAccumSec ?? 0;
+		this.restRunning = snap.restRunning ?? false;
+		this.session = snap.session;
+		this.nowMs = Date.now();
+
+		// Left mid-rest for hours? Drop the stale rest so the banner doesn't show a
+		// nonsense overage on resume.
+		if (this.restForSet && this.restElapsedSec > this.restSeedSec + 3600) {
+			this.restRunning = false;
+			this.restForSet = null;
+			this.restSeedSec = 0;
+			this.restAccumSec = 0;
+		}
+		this.restHapticFired = this.restElapsedSec >= this.restSeedSec;
+
+		this.ensureInterval();
+		void this.hydrateMeta();
+	}
+
+	/** Re-fetch exercise metadata + suggestions for a restored session (async). */
+	private async hydrateMeta() {
+		const s = this.session;
+		if (!s) return;
+		const repo = getRepository();
+		await settings.load();
+		const exAll = await repo.listExercises();
+		const byId = new Map(exAll.map((e) => [e.id, e]));
+		this.meta = s.exercises.map((le) => byId.get(le.exerciseId) as Exercise);
+		const sugg: Record<string, Suggestion | null> = {};
+		if (settings.current.autoProgression) {
+			for (const le of s.exercises) {
+				const ex = byId.get(le.exerciseId);
+				if (!ex) continue;
+				const last = await repo.lastSessionForExercise(ex.id);
+				sugg[ex.id] = computeSuggestion(ex, last);
+			}
+		}
+		this.suggestions = sugg;
+	}
+
 	addExercise(ex: Exercise, sets = 3) {
 		if (!this.session) return;
 		this.meta.push(ex);
@@ -198,24 +326,36 @@ class WorkoutStore {
 			return;
 		}
 		set.completed = true;
-		// assign elapsed rest to whichever set we were resting on
+		// assign elapsed rest to whichever set we were resting on (read before reset)
 		if (this.restForSet) {
 			const prev = this.session!.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
 			if (prev) prev.restTakenSec = Math.max(0, Math.round(this.restElapsedSec));
 		}
-		// start resting for this set
+		// start resting for this set — wall-clock from now
 		this.restSeedSec = this.plannedRest[exIndex]?.[setIndex] ?? settings.current.defaultRestSec;
-		this.restElapsedSec = 0;
-		this.restRunning = true;
 		this.restForSet = { ex: exIndex, set: setIndex };
+		this.restStartedAtMs = Date.now();
+		this.restAccumSec = 0;
+		this.restRunning = true;
+		this.restHapticFired = false;
+		this.nowMs = Date.now();
 		this.setActiveToFirstIncomplete();
 	}
 
 	adjustRest(delta: number) {
 		this.restSeedSec = Math.max(5, this.restSeedSec + delta);
+		if (this.restElapsedSec < this.restSeedSec) this.restHapticFired = false; // re-arm if we pushed past the buzz
 	}
 	togglePause() {
-		this.restRunning = !this.restRunning;
+		if (this.restRunning) {
+			// bank the running segment, then freeze
+			this.restAccumSec = Math.max(0, this.restAccumSec + (Date.now() - this.restStartedAtMs) / 1000);
+			this.restRunning = false;
+		} else {
+			this.restStartedAtMs = Date.now();
+			this.nowMs = Date.now();
+			this.restRunning = true;
+		}
 	}
 	skipRest() {
 		if (this.restForSet) {
@@ -223,16 +363,20 @@ class WorkoutStore {
 			if (prev) prev.restTakenSec = Math.max(0, Math.round(this.restElapsedSec));
 		}
 		this.restRunning = false;
-		this.restElapsedSec = 0;
+		this.restAccumSec = 0;
+		this.restStartedAtMs = 0;
 		this.restSeedSec = 0;
 		this.restForSet = null;
+		this.restHapticFired = false;
 	}
 
 	private resetTimerState() {
 		this.restRunning = false;
-		this.restElapsedSec = 0;
+		this.restAccumSec = 0;
+		this.restStartedAtMs = 0;
 		this.restSeedSec = 0;
 		this.restForSet = null;
+		this.restHapticFired = false;
 		this.activeEx = 0;
 		this.activeSet = 0;
 	}
@@ -280,6 +424,11 @@ class WorkoutStore {
 		this.plannedRest = [];
 		this.suggestions = {};
 		this.resetTimerState();
+		try {
+			if (typeof localStorage !== 'undefined') localStorage.removeItem(RESUME_KEY);
+		} catch {
+			/* ignore */
+		}
 	}
 }
 

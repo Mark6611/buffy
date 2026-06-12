@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import '../app.css';
 	// Self-hosted fonts — bundled into the app so they load instantly and work
 	// offline (no Google Fonts request, which blanks the screen inside a WebView).
@@ -13,6 +14,7 @@
 	import '@fontsource/jetbrains-mono/700.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { ensurePersistentStorage, setupNativeChrome } from '$lib/native';
+	import { workout } from '$lib/stores/workout.svelte';
 
 	// Svelte 5 runes: `children` is the page being rendered inside the layout.
 	let { children } = $props();
@@ -20,6 +22,10 @@
 	onMount(() => {
 		ensurePersistentStorage();
 		setupNativeChrome();
+		// Resume an in-progress workout after an app restart / WebView purge, and
+		// drop the user straight back into it.
+		workout.restore();
+		if (workout.active) goto('/workout');
 	});
 </script>
 

@@ -124,11 +124,9 @@
 						{/if}
 					</div>
 				{/each}
-				{#if workout.session.sourceTemplateId == null}
-					<button class="btn btn-ghost btn-block" style="margin-top:6px" onclick={() => goto('/picker?to=workout')}>
-						<Icon name="plus" size={18} />Add exercise
-					</button>
-				{/if}
+				<button class="btn btn-ghost btn-block" style="margin-top:6px" onclick={() => goto('/picker?to=workout')}>
+					<Icon name="plus" size={18} />Add exercise
+				</button>
 			</div>
 		</div>
 	</div>
