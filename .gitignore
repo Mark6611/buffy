@@ -13,6 +13,9 @@ node_modules
 .DS_Store
 Thumbs.db
 
+# Local reference material (Motra screenshots), not part of the app
+Buffy REF/
+
 # Env
 .env
 .env.*
