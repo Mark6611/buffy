@@ -13,15 +13,22 @@
 	import '@fontsource/jetbrains-mono/600.css';
 	import '@fontsource/jetbrains-mono/700.css';
 	import favicon from '$lib/assets/favicon.svg';
-	import { ensurePersistentStorage, setupNativeChrome } from '$lib/native';
+	import {
+		ensurePersistentStorage,
+		setupNativeChrome,
+		hideSplash,
+		requestNotificationPermission
+	} from '$lib/native';
 	import { workout } from '$lib/stores/workout.svelte';
 
 	// Svelte 5 runes: `children` is the page being rendered inside the layout.
 	let { children } = $props();
 
 	onMount(() => {
+		hideSplash(); // app has painted — fade the native splash out (no black gap)
 		ensurePersistentStorage();
 		setupNativeChrome();
+		requestNotificationPermission();
 		// Resume an in-progress workout after an app restart / WebView purge, and
 		// drop the user straight back into it.
 		workout.restore();

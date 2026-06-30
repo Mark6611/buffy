@@ -6,7 +6,14 @@ import { getRepository } from '$lib/db';
 import type { Exercise, LoggedExercise, LoggedSet, WorkoutSession } from '$lib/types';
 import { settings } from './settings.svelte';
 import { computeSuggestion, type Suggestion } from '$lib/progression';
-import { haptic } from '$lib/native';
+import {
+	haptic,
+	keepAwake,
+	allowSleep,
+	reacquireWakeLock,
+	scheduleRestEndAlert,
+	cancelRestEndAlert
+} from '$lib/native';
 
 function newId(): string {
 	return crypto.randomUUID();
@@ -59,7 +66,16 @@ class WorkoutStore {
 			// timers jump to the real elapsed time instead of waiting for the next
 			// tick (and the interval, which iOS suspended, resumes on its own).
 			document.addEventListener('visibilitychange', () => {
-				if (document.visibilityState === 'visible') this.nowMs = Date.now();
+				if (document.visibilityState === 'visible') {
+					this.nowMs = Date.now();
+					cancelRestEndAlert(); // back in-app — the on-screen + haptic cue takes over
+					reacquireWakeLock();
+				} else if (this.restRunning && this.restForSet && this.restRemaining > 0) {
+					// backgrounded mid-rest: hand the rest-over alert to the OS so it
+					// still fires (sound + system buzz) while the app is suspended/locked
+					const endMs = this.restStartedAtMs + (this.restSeedSec - this.restAccumSec) * 1000;
+					scheduleRestEndAlert(endMs, this.meta[this.restForSet.ex]?.name);
+				}
 			});
 		}
 		if (typeof window !== 'undefined') {
@@ -202,6 +218,7 @@ class WorkoutStore {
 		this.setActiveToFirstIncomplete();
 		this.nowMs = Date.now();
 		this.ensureInterval();
+		keepAwake();
 	}
 
 	startAdhoc() {
@@ -218,6 +235,7 @@ class WorkoutStore {
 		this.resetTimerState();
 		this.nowMs = Date.now();
 		this.ensureInterval();
+		keepAwake();
 	}
 
 	/** Resume an in-progress workout after an app restart / WebView purge. */
@@ -254,6 +272,7 @@ class WorkoutStore {
 		this.restHapticFired = this.restElapsedSec >= this.restSeedSec;
 
 		this.ensureInterval();
+		keepAwake();
 		void this.hydrateMeta();
 	}
 
@@ -326,6 +345,8 @@ class WorkoutStore {
 			return;
 		}
 		set.completed = true;
+		haptic('medium'); // tactile confirm of a logged set
+		cancelRestEndAlert(); // clear any pending alert from the rest we just ended
 		// assign elapsed rest to whichever set we were resting on (read before reset)
 		if (this.restForSet) {
 			const prev = this.session!.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
@@ -346,6 +367,16 @@ class WorkoutStore {
 		this.restSeedSec = Math.max(5, this.restSeedSec + delta);
 		if (this.restElapsedSec < this.restSeedSec) this.restHapticFired = false; // re-arm if we pushed past the buzz
 	}
+	/** Set the running rest timer to an absolute duration (tap-to-edit on the banner). */
+	setRestSeed(sec: number) {
+		this.restSeedSec = Math.max(5, Math.round(sec || 0));
+		if (this.restElapsedSec < this.restSeedSec) this.restHapticFired = false;
+	}
+	/** Change the planned rest (timer seed) for an upcoming set. */
+	setPlannedRest(exIndex: number, setIndex: number, sec: number) {
+		const row = this.plannedRest[exIndex];
+		if (row && setIndex < row.length) row[setIndex] = Math.max(0, Math.round(sec || 0));
+	}
 	togglePause() {
 		if (this.restRunning) {
 			// bank the running segment, then freeze
@@ -362,6 +393,7 @@ class WorkoutStore {
 			const prev = this.session?.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
 			if (prev) prev.restTakenSec = Math.max(0, Math.round(this.restElapsedSec));
 		}
+		cancelRestEndAlert();
 		this.restRunning = false;
 		this.restAccumSec = 0;
 		this.restStartedAtMs = 0;
@@ -419,6 +451,8 @@ class WorkoutStore {
 
 	cancel() {
 		this.stopInterval();
+		allowSleep();
+		cancelRestEndAlert();
 		this.session = null;
 		this.meta = [];
 		this.plannedRest = [];

@@ -71,3 +71,104 @@ export async function saveTextFile(filename: string, content: string, mimeType: 
 	a.click();
 	URL.revokeObjectURL(url);
 }
+
+// ─────────────────────────────────────────────────────────── rest-end alert
+// A single scheduled local notification so the rest-over cue reaches you even
+// when the app is backgrounded or the phone is locked (the in-app haptic only
+// fires in the foreground). Fixed id → scheduling replaces, cancel removes.
+const REST_NOTIF_ID = 1001;
+
+/** Ask for notification permission (native only; called once at launch). */
+export async function requestNotificationPermission(): Promise<void> {
+	if (!isNative) return;
+	try {
+		const { LocalNotifications } = await import('@capacitor/local-notifications');
+		const perm = await LocalNotifications.checkPermissions();
+		if (perm.display !== 'granted') await LocalNotifications.requestPermissions();
+	} catch {
+		/* best-effort */
+	}
+}
+
+/** Schedule the rest-over alert for `atMs` (native only). */
+export async function scheduleRestEndAlert(atMs: number, label?: string): Promise<void> {
+	if (!isNative) return;
+	try {
+		const { LocalNotifications } = await import('@capacitor/local-notifications');
+		await LocalNotifications.cancel({ notifications: [{ id: REST_NOTIF_ID }] });
+		if (atMs <= Date.now() + 750) return; // already over / too soon to matter
+		await LocalNotifications.schedule({
+			notifications: [
+				{
+					id: REST_NOTIF_ID,
+					title: 'Rest complete',
+					body: label ? `${label} — time for your next set` : 'Time for your next set',
+					schedule: { at: new Date(atMs), allowWhileIdle: true },
+					sound: 'default'
+				}
+			]
+		});
+	} catch {
+		/* best-effort */
+	}
+}
+
+/** Cancel any pending rest-over alert. */
+export async function cancelRestEndAlert(): Promise<void> {
+	if (!isNative) return;
+	try {
+		const { LocalNotifications } = await import('@capacitor/local-notifications');
+		await LocalNotifications.cancel({ notifications: [{ id: REST_NOTIF_ID }] });
+	} catch {
+		/* best-effort */
+	}
+}
+
+// ─────────────────────────────────────────────────────────── keep-awake
+// Web Wake Lock API — works inside the iOS WebView (16.4+) and the PWA, so the
+// screen stays on mid-workout without a native plugin. The OS drops the lock
+// when the page hides, so it must be re-acquired on return to the foreground.
+let wakeLock: { release: () => Promise<void> } | null = null;
+let wantWake = false;
+
+/** Keep the screen on (call when a workout becomes active). */
+export async function keepAwake(): Promise<void> {
+	wantWake = true;
+	try {
+		const nav = navigator as unknown as { wakeLock?: { request: (t: string) => Promise<typeof wakeLock> } };
+		if (nav.wakeLock && document.visibilityState === 'visible' && !wakeLock) {
+			wakeLock = await nav.wakeLock.request('screen');
+		}
+	} catch {
+		/* unavailable / denied */
+	}
+}
+
+/** Let the screen sleep again (call when the workout ends). */
+export async function allowSleep(): Promise<void> {
+	wantWake = false;
+	try {
+		await wakeLock?.release();
+	} catch {
+		/* ignore */
+	}
+	wakeLock = null;
+}
+
+/** Re-acquire the wake lock after returning to the foreground. */
+export async function reacquireWakeLock(): Promise<void> {
+	wakeLock = null; // the OS already released it on hide
+	if (wantWake) await keepAwake();
+}
+
+// ─────────────────────────────────────────────────────────── splash
+/** Hide the native splash once the app has painted (kills the cold-launch black gap). */
+export async function hideSplash(): Promise<void> {
+	if (!isNative) return;
+	try {
+		const { SplashScreen } = await import('@capacitor/splash-screen');
+		await SplashScreen.hide({ fadeOutDuration: 200 });
+	} catch {
+		/* plugin may be absent */
+	}
+}

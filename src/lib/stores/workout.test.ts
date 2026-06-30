@@ -27,7 +27,15 @@ const h = vi.hoisted(() => {
 });
 vi.mock('$lib/db', () => ({ getRepository: () => h.repo, ensureSeeded: async () => {} }));
 vi.mock('$lib/stores/settings.svelte', () => ({ settings: h.settings }));
-vi.mock('$lib/native', () => ({ haptic: async () => {}, isNative: false }));
+vi.mock('$lib/native', () => ({
+	haptic: async () => {},
+	isNative: false,
+	keepAwake: async () => {},
+	allowSleep: async () => {},
+	reacquireWakeLock: async () => {},
+	scheduleRestEndAlert: async () => {},
+	cancelRestEndAlert: async () => {}
+}));
 
 import { workout } from '$lib/stores/workout.svelte';
 

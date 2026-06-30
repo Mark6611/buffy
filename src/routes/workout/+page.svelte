@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { mmss, kg, parseMmss } from '$lib/format';
+	import type { LoggedSet } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import RestBanner from '$lib/components/RestBanner.svelte';
@@ -27,6 +28,12 @@
 		}
 	}
 </script>
+
+{#snippet restCell(exIndex: number, s: number, set: LoggedSet)}
+	<td class={set.completed ? '' : 'muted'}>
+		{#if set.completed}{set.restTakenSec != null ? mmss(set.restTakenSec) : '—'}{:else if s === 0}—{:else}<input class="inp rest-inp" type="text" value={mmss(workout.plannedRest[exIndex]?.[s] ?? 0)} onchange={(e) => workout.setPlannedRest(exIndex, s, parseMmss(e.currentTarget.value))} />{/if}
+	</td>
+{/snippet}
 
 {#if workout.session}
 	<div class="screen">
@@ -81,7 +88,6 @@
 							<tbody>
 								{#each le.sets as set, s (s)}
 									{@const isActive = exIndex === workout.activeEx && s === workout.activeSet && !set.completed}
-									{@const restCol = set.completed ? (set.restTakenSec != null ? mmss(set.restTakenSec) : '—') : s === 0 ? '—' : mmss(workout.plannedRest[exIndex]?.[s] ?? 0)}
 									<tr class={set.completed ? 'row-done' : isActive ? 'row-active' : ''}>
 										<td class="c">
 											<button class="setcheck {set.completed ? 'done' : ''}" onclick={() => workout.toggleSet(exIndex, s)} aria-label="toggle set">
@@ -91,17 +97,17 @@
 										<td class="l muted" style="font-weight:600;{isActive ? 'color:var(--accent-ink)' : ''}">{s + 1}</td>
 
 										{#if tt === 'cardio'}
-											<td>{#if set.completed}{mmss(set.timeSec ?? 0)}{:else}<input class="inp" type="text" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} />{/if}</td>
-											<td>{#if set.completed}{set.incline ?? 0}%{:else}<input class="inp" type="number" value={set.incline ?? ''} oninput={(e) => (set.incline = numOrUndef(e.currentTarget.value))} />{/if}</td>
-											<td>{#if set.completed}{set.speed ?? 0}{:else}<input class="inp" type="number" value={set.speed ?? ''} oninput={(e) => (set.speed = numOrUndef(e.currentTarget.value))} />{/if}</td>
+											<td><input class="inp" type="text" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
+											<td><input class="inp" type="number" value={set.incline ?? ''} oninput={(e) => (set.incline = numOrUndef(e.currentTarget.value))} /></td>
+											<td><input class="inp" type="number" value={set.speed ?? ''} oninput={(e) => (set.speed = numOrUndef(e.currentTarget.value))} /></td>
 										{:else if tt === 'time_hold'}
-											<td class={set.completed ? '' : 'muted'}>{restCol}</td>
-											<td>{#if set.completed}{mmss(set.durationSec ?? 0)}{:else}<input class="inp" type="text" value={mmss(set.durationSec ?? 0)} onchange={(e) => (set.durationSec = parseMmss(e.currentTarget.value))} />{/if}</td>
+											{@render restCell(exIndex, s, set)}
+											<td><input class="inp" type="text" value={mmss(set.durationSec ?? 0)} onchange={(e) => (set.durationSec = parseMmss(e.currentTarget.value))} /></td>
 										{:else}
-											<td class={set.completed ? '' : 'muted'}>{restCol}</td>
-											<td>{#if set.completed}{set.reps ?? ''}{:else}<input class="inp" type="number" value={set.reps ?? ''} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} />{/if}</td>
+											{@render restCell(exIndex, s, set)}
+											<td><input class="inp" type="number" value={set.reps ?? ''} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} /></td>
 											{#if !bw}
-												<td>{#if set.completed}{kg(set.weight)}{:else}<input class="inp" type="number" step="0.5" value={set.weight ?? ''} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} />{/if}</td>
+												<td><input class="inp" type="number" step="0.5" value={set.weight ?? ''} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} /></td>
 											{/if}
 										{/if}
 									</tr>
