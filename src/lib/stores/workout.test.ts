@@ -34,7 +34,9 @@ vi.mock('$lib/native', () => ({
 	allowSleep: async () => {},
 	reacquireWakeLock: async () => {},
 	scheduleRestEndAlert: async () => {},
-	cancelRestEndAlert: async () => {}
+	cancelRestEndAlert: async () => {},
+	startRestLiveActivity: async () => {},
+	endRestLiveActivity: async () => {}
 }));
 
 import { workout } from '$lib/stores/workout.svelte';

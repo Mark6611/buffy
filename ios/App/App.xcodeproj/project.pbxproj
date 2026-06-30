@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0D61000BD686D8081074A6CE /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6BE7BF9C116BD7F8C11AA3AD /* Foundation.framework */; };
+		1EFC8D7D9296D9EC7EDA897D /* RestActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5916855531BAE2811924BFBB /* RestActivityPlugin.swift */; };
+		1F3D75E76E17A7AFCAF7A8F4 /* RestWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 11BD0F45E2A1DC5071B5D5F1 /* RestWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -15,9 +18,41 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		6FEC1812431F33B5C10AFA7A /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */; };
+		DBEEA10B69AF609034F73AE1 /* RestWidgetLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200C8B846BCFDA1D24AA123E /* RestWidgetLiveActivity.swift */; };
+		DF4F910C40A511B8EE9E21F0 /* RestWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3690937977D5F0454EAFB0D /* RestWidgetBundle.swift */; };
+		DFFE6D2DB4DB83788B8D9656 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24EB71C798823809720098CF /* ViewController.swift */; };
+		EBEA85E4D5A4C8901016BC40 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B163E294451C0233BF29119B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B19A7C988010DEF320BA6727;
+			remoteInfo = RestWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7840C5A5D62438586A40355A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1F3D75E76E17A7AFCAF7A8F4 /* RestWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		11BD0F45E2A1DC5071B5D5F1 /* RestWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RestWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		200C8B846BCFDA1D24AA123E /* RestWidgetLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestWidgetLiveActivity.swift; path = RestWidget/RestWidgetLiveActivity.swift; sourceTree = "<group>"; };
+		24EB71C798823809720098CF /* ViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ViewController.swift; path = App/ViewController.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -27,7 +62,11 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		5916855531BAE2811924BFBB /* RestActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestActivityPlugin.swift; path = App/RestActivityPlugin.swift; sourceTree = "<group>"; };
+		6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestActivityAttributes.swift; path = Shared/RestActivityAttributes.swift; sourceTree = "<group>"; };
+		6BE7BF9C116BD7F8C11AA3AD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		F3690937977D5F0454EAFB0D /* RestWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestWidgetBundle.swift; path = RestWidget/RestWidgetBundle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -39,15 +78,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F1EC26BD9D0C5D01A2DCE852 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0D61000BD686D8081074A6CE /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2A52C26ABAC58300C3B543EE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A412B1B44EEE1D53CC7E3E3E /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */,
+				5916855531BAE2811924BFBB /* RestActivityPlugin.swift */,
+				F3690937977D5F0454EAFB0D /* RestWidgetBundle.swift */,
+				200C8B846BCFDA1D24AA123E /* RestWidgetLiveActivity.swift */,
+				2A52C26ABAC58300C3B543EE /* Frameworks */,
+				24EB71C798823809720098CF /* ViewController.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -55,6 +116,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				11BD0F45E2A1DC5071B5D5F1 /* RestWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,6 +136,14 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		A412B1B44EEE1D53CC7E3E3E /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				6BE7BF9C116BD7F8C11AA3AD /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -84,10 +154,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				7840C5A5D62438586A40355A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A78F0DD37D909BAC785C01D8 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -96,6 +168,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B19A7C988010DEF320BA6727 /* RestWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70B4DFC53685A548FA483516 /* Build configuration list for PBXNativeTarget "RestWidget" */;
+			buildPhases = (
+				86E93DF5857EDFF27599048D /* Sources */,
+				F1EC26BD9D0C5D01A2DCE852 /* Frameworks */,
+				8E4C75F358C66C048614C484 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RestWidget;
+			productName = RestWidget;
+			productReference = 11BD0F45E2A1DC5071B5D5F1 /* RestWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -130,6 +219,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				B19A7C988010DEF320BA6727 /* RestWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -148,6 +238,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8E4C75F358C66C048614C484 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -156,10 +253,32 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				1EFC8D7D9296D9EC7EDA897D /* RestActivityPlugin.swift in Sources */,
+				6FEC1812431F33B5C10AFA7A /* RestActivityAttributes.swift in Sources */,
+				DFFE6D2DB4DB83788B8D9656 /* ViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		86E93DF5857EDFF27599048D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DF4F910C40A511B8EE9E21F0 /* RestWidgetBundle.swift in Sources */,
+				DBEEA10B69AF609034F73AE1 /* RestWidgetLiveActivity.swift in Sources */,
+				EBEA85E4D5A4C8901016BC40 /* RestActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A78F0DD37D909BAC785C01D8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RestWidget;
+			target = B19A7C988010DEF320BA6727 /* RestWidget */;
+			targetProxy = B163E294451C0233BF29119B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -334,6 +453,57 @@
 			};
 			name = Release;
 		};
+		B4436A58D7A24F0285F45977 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZCS5Y23P62;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RestWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mark.buffy.RestWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D532CCBF978F00AF07D6195B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZCS5Y23P62;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RestWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mark.buffy.RestWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -351,6 +521,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		70B4DFC53685A548FA483516 /* Build configuration list for PBXNativeTarget "RestWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B4436A58D7A24F0285F45977 /* Release */,
+				D532CCBF978F00AF07D6195B /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

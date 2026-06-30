@@ -1,6 +1,6 @@
 // Thin native bridge. On iOS (Capacitor) these use native plugins; on the web they
 // fall back gracefully (or no-op), so the same code runs in the PWA and the app.
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export const isNative = Capacitor.isNativePlatform();
 
@@ -170,5 +170,35 @@ export async function hideSplash(): Promise<void> {
 		await SplashScreen.hide({ fadeOutDuration: 200 });
 	} catch {
 		/* plugin may be absent */
+	}
+}
+
+// ───────────────────────────────────────── Live Activity (Dynamic Island)
+// Bridges to the native RestActivityPlugin (ActivityKit). The countdown is
+// driven by SwiftUI's Text(timerInterval:) — we just hand it the end time, so
+// no per-second IPC is needed.
+interface RestActivityBridge {
+	start(opts: { startTime: number; endTime: number; label: string }): Promise<void>;
+	end(): Promise<void>;
+}
+const RestActivity = registerPlugin<RestActivityBridge>('RestActivity');
+
+/** Show the rest countdown on the Lock Screen + Dynamic Island (native only). */
+export async function startRestLiveActivity(startMs: number, endMs: number, label: string): Promise<void> {
+	if (!isNative) return;
+	try {
+		await RestActivity.start({ startTime: startMs, endTime: endMs, label: label || 'Rest' });
+	} catch {
+		/* best-effort */
+	}
+}
+
+/** End the rest Live Activity. */
+export async function endRestLiveActivity(): Promise<void> {
+	if (!isNative) return;
+	try {
+		await RestActivity.end();
+	} catch {
+		/* best-effort */
 	}
 }

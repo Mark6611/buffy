@@ -12,7 +12,9 @@ import {
 	allowSleep,
 	reacquireWakeLock,
 	scheduleRestEndAlert,
-	cancelRestEndAlert
+	cancelRestEndAlert,
+	startRestLiveActivity,
+	endRestLiveActivity
 } from '$lib/native';
 
 function newId(): string {
@@ -273,6 +275,7 @@ class WorkoutStore {
 
 		this.ensureInterval();
 		keepAwake();
+		this.restLiveSync(); // restart (or clear a stale) Live Activity on resume
 		void this.hydrateMeta();
 	}
 
@@ -361,16 +364,19 @@ class WorkoutStore {
 		this.restHapticFired = false;
 		this.nowMs = Date.now();
 		this.setActiveToFirstIncomplete();
+		this.restLiveSync();
 	}
 
 	adjustRest(delta: number) {
 		this.restSeedSec = Math.max(5, this.restSeedSec + delta);
 		if (this.restElapsedSec < this.restSeedSec) this.restHapticFired = false; // re-arm if we pushed past the buzz
+		this.restLiveSync();
 	}
 	/** Set the running rest timer to an absolute duration (tap-to-edit on the banner). */
 	setRestSeed(sec: number) {
 		this.restSeedSec = Math.max(5, Math.round(sec || 0));
 		if (this.restElapsedSec < this.restSeedSec) this.restHapticFired = false;
+		this.restLiveSync();
 	}
 	/** Change the planned rest (timer seed) for an upcoming set. */
 	setPlannedRest(exIndex: number, setIndex: number, sec: number) {
@@ -387,6 +393,7 @@ class WorkoutStore {
 			this.nowMs = Date.now();
 			this.restRunning = true;
 		}
+		this.restLiveSync();
 	}
 	skipRest() {
 		if (this.restForSet) {
@@ -400,6 +407,7 @@ class WorkoutStore {
 		this.restSeedSec = 0;
 		this.restForSet = null;
 		this.restHapticFired = false;
+		this.restLiveSync();
 	}
 
 	private resetTimerState() {
@@ -411,6 +419,16 @@ class WorkoutStore {
 		this.restHapticFired = false;
 		this.activeEx = 0;
 		this.activeSet = 0;
+	}
+
+	/** Keep the Dynamic Island / Lock Screen Live Activity in sync with the rest timer. */
+	private restLiveSync() {
+		if (this.restRunning && this.restForSet && this.restRemaining > 0.5) {
+			const now = Date.now();
+			startRestLiveActivity(now, now + this.restRemaining * 1000, this.meta[this.restForSet.ex]?.name ?? 'Rest');
+		} else {
+			endRestLiveActivity();
+		}
 	}
 
 	private setActiveToFirstIncomplete() {
@@ -453,6 +471,7 @@ class WorkoutStore {
 		this.stopInterval();
 		allowSleep();
 		cancelRestEndAlert();
+		endRestLiveActivity();
 		this.session = null;
 		this.meta = [];
 		this.plannedRest = [];
