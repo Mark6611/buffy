@@ -320,3 +320,69 @@ describe('interactive Live Activity reconciliation', () => {
 		expect(workout.restRemaining).toBeCloseTo(30, 0);
 	});
 });
+
+const curl: Exercise = {
+	id: 'curl',
+	name: 'Dumbbell Bicep Curl',
+	equipment: 'dumbbell',
+	primaryMuscles: ['Biceps'],
+	secondaryMuscles: [],
+	trackingType: 'weight_reps',
+	loadType: 'per_side',
+	defaultTargetReps: 12,
+	weightStep: 1,
+	defaultRestSec: 45
+};
+
+describe('removeExercise', () => {
+	it('drops the exercise and its meta/rest rows together', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.addExercise(curl);
+		workout.removeExercise(0);
+		expect(workout.session?.exercises).toHaveLength(1);
+		expect(workout.session?.exercises[0].exerciseId).toBe('curl');
+		expect(workout.meta.map((e) => e.id)).toEqual(['curl']);
+		expect(workout.plannedRest).toHaveLength(1);
+	});
+
+	it('clears the rest timer when the exercise currently being rested for is removed', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0); // starts a rest against exercise 0
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		workout.removeExercise(0);
+		expect(workout.restForSet).toBeNull();
+		expect(workout.restRunning).toBe(false);
+		expect(workout.session?.exercises).toHaveLength(0);
+	});
+
+	it('shifts restForSet.ex down when an earlier exercise is removed', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // ex 0
+		workout.addExercise(curl); // ex 1
+		workout.toggleSet(1, 0); // rest against exercise 1 (curl)
+		expect(workout.restForSet).toEqual({ ex: 1, set: 0 });
+		workout.removeExercise(0); // remove press — curl shifts to index 0
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		expect(workout.restRunning).toBe(true);
+		expect(workout.session?.exercises[0].exerciseId).toBe('curl');
+	});
+
+	it('leaves an unrelated running rest untouched when a later exercise is removed', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // ex 0
+		workout.addExercise(curl); // ex 1
+		workout.toggleSet(0, 0); // rest against exercise 0
+		workout.removeExercise(1); // remove curl — press keeps index 0
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		expect(workout.restRunning).toBe(true);
+	});
+
+	it('is a no-op past the end of the exercise list', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.removeExercise(5);
+		expect(workout.session?.exercises).toHaveLength(1);
+	});
+});

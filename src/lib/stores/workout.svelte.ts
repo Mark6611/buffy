@@ -322,6 +322,32 @@ class WorkoutStore {
 		});
 	}
 
+	/** Remove an exercise entirely from the in-progress workout (any logged sets on it are lost). */
+	removeExercise(exIndex: number) {
+		const s = this.session;
+		if (!s || !s.exercises[exIndex]) return;
+		const removedId = s.exercises[exIndex].exerciseId;
+		s.exercises.splice(exIndex, 1);
+		this.meta.splice(exIndex, 1);
+		this.plannedRest.splice(exIndex, 1);
+		if (!s.exercises.some((e) => e.exerciseId === removedId)) delete this.suggestions[removedId];
+
+		if (this.restForSet?.ex === exIndex) {
+			// the exercise we were resting for is gone — nothing left to record it against
+			cancelRestEndAlert();
+			this.restRunning = false;
+			this.restAccumSec = 0;
+			this.restStartedAtMs = 0;
+			this.restSeedSec = 0;
+			this.restForSet = null;
+			this.restHapticFired = false;
+		} else if (this.restForSet && this.restForSet.ex > exIndex) {
+			this.restForSet = { ...this.restForSet, ex: this.restForSet.ex - 1 };
+		}
+		this.setActiveToFirstIncomplete();
+		this.restLiveSync();
+	}
+
 	addSet(exIndex: number) {
 		const le = this.session?.exercises[exIndex];
 		if (!le) return;

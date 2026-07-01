@@ -9,7 +9,8 @@
 	import { getRepository } from '$lib/db';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { writeHealthWorkout } from '$lib/native';
-	import type { LoggedSet } from '$lib/types';
+	import { applyFullSync, applyWeightsOnlySync, buildTemplateFromSession } from '$lib/templateSync';
+	import type { LoggedSet, Template, WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import RestBanner from '$lib/components/RestBanner.svelte';
@@ -23,15 +24,41 @@
 		return Number.isFinite(n) ? n : undefined;
 	}
 
+	// After finishing, offer to sync the result back into its source template (or,
+	// for a quick-log session, offer to save it as a brand-new one) before leaving.
+	let syncPrompt = $state<{ savedId: string; session: WorkoutSession; template: Template | null } | null>(null);
+	let newTemplateName = $state('');
+	let syncBusy = $state(false);
+
 	async function finish() {
+		const wasTemplateSourced = workout.session?.sourceTemplateId ?? null;
 		const id = await workout.finish();
-		if (id) {
-			void autoBackup(); // native: snapshot all data to Documents after a logged workout
-			void refreshWidget();
-			if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
-			if (settings.current.writeToHealth) void writeHealthAfterFinish(id);
+		if (!id) {
+			goto('/');
+			return;
 		}
-		goto(id ? `/history/${id}` : '/');
+		void autoBackup(); // native: snapshot all data to Documents after a logged workout
+		void refreshWidget();
+		if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
+		if (settings.current.writeToHealth) void writeHealthAfterFinish(id);
+
+		const repo = getRepository();
+		const saved = await repo.getSession(id);
+		if (!saved) {
+			goto(`/history/${id}`);
+			return;
+		}
+		if (wasTemplateSourced) {
+			const tpl = await repo.getTemplate(wasTemplateSourced);
+			if (!tpl) {
+				goto(`/history/${id}`); // source template was deleted mid-workout — nothing to sync
+				return;
+			}
+			syncPrompt = { savedId: id, session: saved, template: tpl };
+		} else {
+			newTemplateName = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+			syncPrompt = { savedId: id, session: saved, template: null };
+		}
 	}
 	async function refreshWidget() {
 		const repo = getRepository();
@@ -42,11 +69,53 @@
 		const s = await getRepository().getSession(id);
 		if (s?.endedAt) await writeHealthWorkout(Date.parse(s.startedAt), Date.parse(s.endedAt));
 	}
+	function finalizeSync() {
+		const id = syncPrompt?.savedId;
+		syncPrompt = null;
+		goto(id ? `/history/${id}` : '/');
+	}
+	async function chooseTemplateSync(mode: 'full' | 'weightsOnly' | 'none') {
+		if (syncPrompt?.template && mode !== 'none') {
+			syncBusy = true;
+			const repo = getRepository();
+			// snapshot: syncPrompt is $state, so its nested objects are reactive
+			// proxies — IndexedDB can't structured-clone those for upsertTemplate.
+			const template = $state.snapshot(syncPrompt.template);
+			const session = $state.snapshot(syncPrompt.session);
+			const updated =
+				mode === 'full'
+					? applyFullSync(template, session, new Map((await repo.listExercises()).map((e) => [e.id, e])))
+					: applyWeightsOnlySync(template, session);
+			await repo.upsertTemplate(updated);
+			syncBusy = false;
+		}
+		finalizeSync();
+	}
+	async function saveAsNewTemplate(save: boolean) {
+		if (save && syncPrompt) {
+			syncBusy = true;
+			const repo = getRepository();
+			const exById = new Map((await repo.listExercises()).map((e) => [e.id, e]));
+			const session = $state.snapshot(syncPrompt.session);
+			await repo.upsertTemplate(buildTemplateFromSession(session, exById, newTemplateName.trim() || 'New Template'));
+			syncBusy = false;
+		}
+		finalizeSync();
+	}
 	function close() {
 		if (confirm('Discard this workout? Nothing will be saved.')) {
 			workout.cancel();
 			goto('/');
 		}
+	}
+	function removeExercise(exIndex: number) {
+		const le = workout.session?.exercises[exIndex];
+		const hasLoggedSets = !!le?.sets.some((s) => s.completed);
+		const name = workout.meta[exIndex]?.name ?? 'this exercise';
+		const msg = hasLoggedSets
+			? `Remove ${name}? Sets you've already logged for it will be lost.`
+			: `Remove ${name} from this workout?`;
+		if (confirm(msg)) workout.removeExercise(exIndex);
 	}
 </script>
 
@@ -94,6 +163,9 @@
 									<span class="setup-note"><Icon name="cog" size={12} sw={2} />{le.setupNote}</span>
 								{/if}
 							</div>
+							<button class="icon-btn" style="flex:0 0 auto" onclick={() => removeExercise(exIndex)} aria-label="Remove exercise">
+								<Icon name="trash" size={17} color="var(--ink-3)" />
+							</button>
 						</div>
 
 						<table class="settable">
@@ -174,5 +246,44 @@
 				</div>
 			</div>
 		</div>
+	</div>
+{/if}
+
+{#if syncPrompt}
+	<button
+		style="position:fixed;inset:0;background:rgba(20,16,12,0.4);z-index:40;border:none"
+		aria-label="Dismiss"
+		onclick={finalizeSync}
+		disabled={syncBusy}
+	></button>
+	<div style="position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-radius:24px 24px 0 0;padding:22px 20px calc(30px + env(safe-area-inset-bottom,0));box-shadow:0 -10px 40px rgba(0,0,0,0.2);max-width:480px;margin:0 auto">
+		<div style="width:40px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 18px"></div>
+		<span class="stat-ic" style="width:46px;height:46px;background:var(--accent-tint);margin-bottom:14px"><Icon name="swap" size={22} color="var(--accent-ink)" /></span>
+
+		{#if syncPrompt.template}
+			<div class="h-card" style="font-size:19px;margin-bottom:6px">Update “{syncPrompt.template.name}”?</div>
+			<div class="txt" style="margin-bottom:16px">You made changes this workout — apply them back to the template for next time?</div>
+			<div style="display:flex;flex-direction:column;gap:9px">
+				<button class="btn btn-accent" onclick={() => chooseTemplateSync('full')} disabled={syncBusy}>
+					Update whole template
+				</button>
+				<button class="btn btn-ghost" onclick={() => chooseTemplateSync('weightsOnly')} disabled={syncBusy}>
+					Update weights only
+				</button>
+				<button class="btn btn-ghost" style="color:var(--ink-3)" onclick={() => chooseTemplateSync('none')} disabled={syncBusy}>
+					{syncBusy ? 'Working…' : "Leave template as-is"}
+				</button>
+			</div>
+		{:else}
+			<div class="h-card" style="font-size:19px;margin-bottom:6px">Save as a template?</div>
+			<div class="txt" style="margin-bottom:14px">Turn this quick-logged workout into a reusable template.</div>
+			<input class="inp" style="width:100%;height:44px;margin-bottom:16px" type="text" placeholder="Template name" bind:value={newTemplateName} />
+			<div style="display:flex;gap:10px">
+				<button class="btn btn-ghost" style="flex:1" onclick={() => saveAsNewTemplate(false)} disabled={syncBusy}>Don't save</button>
+				<button class="btn btn-accent" style="flex:1.3" onclick={() => saveAsNewTemplate(true)} disabled={syncBusy || !newTemplateName.trim()}>
+					{syncBusy ? 'Working…' : 'Save as template'}
+				</button>
+			</div>
+		{/if}
 	</div>
 {/if}
