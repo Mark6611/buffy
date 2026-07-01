@@ -233,3 +233,51 @@ describe('restore — resume after app restart', () => {
 		expect(backing.has(RESUME_KEY)).toBe(false);
 	});
 });
+
+describe('superset round-cycling', () => {
+	it('cycles A1→B1→A2→B2 within a group, resting only after the round', () => {
+		const session: WorkoutSession = {
+			id: 'ss',
+			startedAt: new Date(BASE).toISOString(),
+			sourceTemplateId: 't',
+			title: 'SS',
+			exercises: [
+				{ exerciseId: 'a', groupId: 'g', sets: [{ index: 0, completed: false }, { index: 1, completed: false }] },
+				{ exerciseId: 'b', groupId: 'g', sets: [{ index: 0, completed: false }, { index: 1, completed: false }] }
+			]
+		};
+		backing.set(
+			RESUME_KEY,
+			JSON.stringify({
+				session,
+				plannedRest: [[60, 60], [60, 60]],
+				activeEx: 0,
+				activeSet: 0,
+				restRunning: false,
+				restSeedSec: 0,
+				restForSet: null,
+				restStartedAtMs: 0,
+				restAccumSec: 0
+			})
+		);
+		workout.restore();
+		expect([workout.activeEx, workout.activeSet]).toEqual([0, 0]); // A1
+		workout.toggleSet(0, 0);
+		expect([workout.activeEx, workout.activeSet]).toEqual([1, 0]); // → B1
+		expect(workout.restForSet).toBeNull(); // no rest mid-superset
+		workout.toggleSet(1, 0);
+		expect([workout.activeEx, workout.activeSet]).toEqual([0, 1]); // → A2
+		expect(workout.restForSet).toEqual({ ex: 1, set: 0 }); // rest after the round
+		workout.toggleSet(0, 1);
+		expect([workout.activeEx, workout.activeSet]).toEqual([1, 1]); // → B2
+		expect(workout.restForSet).toBeNull();
+	});
+
+	it('non-grouped exercises stay linear', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // groupId null
+		workout.toggleSet(0, 0);
+		expect([workout.activeEx, workout.activeSet]).toEqual([0, 1]); // next set, same exercise
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+	});
+});

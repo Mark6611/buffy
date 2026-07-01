@@ -355,13 +355,23 @@ class WorkoutStore {
 			const prev = this.session!.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
 			if (prev) prev.restTakenSec = Math.max(0, Math.round(this.restElapsedSec));
 		}
-		// start resting for this set — wall-clock from now
-		this.restSeedSec = this.plannedRest[exIndex]?.[setIndex] ?? settings.current.defaultRestSec;
-		this.restForSet = { ex: exIndex, set: setIndex };
-		this.restStartedAtMs = Date.now();
-		this.restAccumSec = 0;
-		this.restRunning = true;
-		this.restHapticFired = false;
+		if (this.isMidSupersetRound(exIndex, setIndex)) {
+			// superset: no rest between exercises within a round — go straight to the next
+			this.restRunning = false;
+			this.restForSet = null;
+			this.restSeedSec = 0;
+			this.restAccumSec = 0;
+			this.restStartedAtMs = 0;
+			this.restHapticFired = false;
+		} else {
+			// start resting for this set — wall-clock from now
+			this.restSeedSec = this.plannedRest[exIndex]?.[setIndex] ?? settings.current.defaultRestSec;
+			this.restForSet = { ex: exIndex, set: setIndex };
+			this.restStartedAtMs = Date.now();
+			this.restAccumSec = 0;
+			this.restRunning = true;
+			this.restHapticFired = false;
+		}
 		this.nowMs = Date.now();
 		this.setActiveToFirstIncomplete();
 		this.restLiveSync();
@@ -435,16 +445,56 @@ class WorkoutStore {
 		}
 	}
 
+	/** Bounds [start, end] of the superset group exIndex belongs to — a maximal run of
+	 *  consecutive exercises sharing a non-null groupId; a standalone exercise is itself. */
+	private groupBounds(exIndex: number): { start: number; end: number } {
+		const s = this.session;
+		if (!s) return { start: exIndex, end: exIndex };
+		const g = s.exercises[exIndex]?.groupId ?? null;
+		if (g == null) return { start: exIndex, end: exIndex };
+		let start = exIndex;
+		let end = exIndex;
+		while (start - 1 >= 0 && s.exercises[start - 1]?.groupId === g) start--;
+		while (end + 1 < s.exercises.length && s.exercises[end + 1]?.groupId === g) end++;
+		return { start, end };
+	}
+
+	/** True if finishing (exIndex, round) is a mid-superset step — another exercise in
+	 *  the group still owes that round — so we go straight on with no rest between. */
+	private isMidSupersetRound(exIndex: number, round: number): boolean {
+		const s = this.session;
+		if (!s) return false;
+		const { start, end } = this.groupBounds(exIndex);
+		if (end === start) return false;
+		for (let g = start; g <= end; g++) {
+			if (g === exIndex) continue;
+			const set = s.exercises[g].sets[round];
+			if (set && !set.completed) return true;
+		}
+		return false;
+	}
+
+	// Advance in superset round order: set r of every exercise in a group (A1→B1→A2→B2…)
+	// before moving on. Standalone exercises log linearly (a group of one).
 	private setActiveToFirstIncomplete() {
 		const s = this.session;
 		if (!s) return;
-		for (let e = 0; e < s.exercises.length; e++) {
-			const idx = s.exercises[e].sets.findIndex((x) => !x.completed);
-			if (idx !== -1) {
-				this.activeEx = e;
-				this.activeSet = idx;
-				return;
+		let e = 0;
+		while (e < s.exercises.length) {
+			const { start, end } = this.groupBounds(e);
+			let maxSets = 0;
+			for (let g = start; g <= end; g++) maxSets = Math.max(maxSets, s.exercises[g].sets.length);
+			for (let r = 0; r < maxSets; r++) {
+				for (let g = start; g <= end; g++) {
+					const set = s.exercises[g].sets[r];
+					if (set && !set.completed) {
+						this.activeEx = g;
+						this.activeSet = r;
+						return;
+					}
+				}
 			}
+			e = end + 1;
 		}
 	}
 
