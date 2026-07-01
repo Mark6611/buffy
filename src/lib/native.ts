@@ -177,9 +177,15 @@ export async function hideSplash(): Promise<void> {
 // Bridges to the native RestActivityPlugin (ActivityKit). The countdown is
 // driven by SwiftUI's Text(timerInterval:) — we just hand it the end time, so
 // no per-second IPC is needed.
+interface PendingRestAdjustment {
+	present: boolean;
+	endTimeMs?: number;
+	skipped?: boolean;
+}
 interface RestActivityBridge {
 	start(opts: { startTime: number; endTime: number; label: string }): Promise<void>;
 	end(): Promise<void>;
+	readPendingAdjustment(): Promise<PendingRestAdjustment>;
 }
 const RestActivity = registerPlugin<RestActivityBridge>('RestActivity');
 
@@ -200,6 +206,22 @@ export async function endRestLiveActivity(): Promise<void> {
 		await RestActivity.end();
 	} catch {
 		/* best-effort */
+	}
+}
+
+/**
+ * Consume a pending +30s / skip event left by a Live Activity button tap while
+ * the app was backgrounded (iOS 17+ interactive Live Activity). Returns null
+ * if there's nothing to reconcile.
+ */
+export async function readPendingRestAdjustment(): Promise<{ endTimeMs: number; skipped: boolean } | null> {
+	if (!isNative) return null;
+	try {
+		const res = await RestActivity.readPendingAdjustment();
+		if (!res.present || res.endTimeMs == null) return null;
+		return { endTimeMs: res.endTimeMs, skipped: !!res.skipped };
+	} catch {
+		return null;
 	}
 }
 

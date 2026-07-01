@@ -14,7 +14,8 @@ import {
 	scheduleRestEndAlert,
 	cancelRestEndAlert,
 	startRestLiveActivity,
-	endRestLiveActivity
+	endRestLiveActivity,
+	readPendingRestAdjustment
 } from '$lib/native';
 
 function newId(): string {
@@ -72,6 +73,7 @@ class WorkoutStore {
 					this.nowMs = Date.now();
 					cancelRestEndAlert(); // back in-app — the on-screen + haptic cue takes over
 					reacquireWakeLock();
+					void this.reconcileLiveActivityAdjustment(); // apply any +30s/skip done from the Island while away
 				} else if (this.restRunning && this.restForSet && this.restRemaining > 0) {
 					// backgrounded mid-rest: hand the rest-over alert to the OS so it
 					// still fires (sound + system buzz) while the app is suspended/locked
@@ -275,7 +277,10 @@ class WorkoutStore {
 
 		this.ensureInterval();
 		keepAwake();
-		this.restLiveSync(); // restart (or clear a stale) Live Activity on resume
+		// A cold relaunch never fires visibilitychange (nothing transitioned FROM
+		// hidden in this process), so a pending Live Activity adjustment has to be
+		// reconciled here too, before the Activity is re-synced to our state.
+		void this.reconcileLiveActivityAdjustment().then(() => this.restLiveSync());
 		void this.hydrateMeta();
 	}
 
@@ -443,6 +448,24 @@ class WorkoutStore {
 		} else {
 			endRestLiveActivity();
 		}
+	}
+
+	/** Apply a +30s/skip done from the Live Activity's own buttons while the app
+	 *  was backgrounded — those act directly on the Activity, so this brings the
+	 *  in-app timer state (and hence the next restLiveSync) back in sync with it. */
+	private applyExternalRestAdjustment(adj: { endTimeMs: number; skipped: boolean }) {
+		if (!this.restForSet) return;
+		if (adj.skipped) {
+			this.skipRest();
+			return;
+		}
+		const remainingSec = (adj.endTimeMs - Date.now()) / 1000;
+		this.setRestSeed(this.restElapsedSec + remainingSec);
+	}
+
+	private async reconcileLiveActivityAdjustment() {
+		const adj = await readPendingRestAdjustment();
+		if (adj) this.applyExternalRestAdjustment(adj);
 	}
 
 	/** Bounds [start, end] of the superset group exIndex belongs to — a maximal run of

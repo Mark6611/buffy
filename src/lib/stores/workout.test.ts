@@ -8,9 +8,11 @@ import type { Exercise, WorkoutSession } from '$lib/types';
 const h = vi.hoisted(() => {
 	const upserted: unknown[] = [];
 	const exercises: Exercise[] = [];
+	const pendingAdjustment: { value: { endTimeMs: number; skipped: boolean } | null } = { value: null };
 	return {
 		upserted,
 		exercises,
+		pendingAdjustment,
 		repo: {
 			listExercises: async () => exercises,
 			lastSessionForExercise: async () => undefined,
@@ -36,7 +38,12 @@ vi.mock('$lib/native', () => ({
 	scheduleRestEndAlert: async () => {},
 	cancelRestEndAlert: async () => {},
 	startRestLiveActivity: async () => {},
-	endRestLiveActivity: async () => {}
+	endRestLiveActivity: async () => {},
+	readPendingRestAdjustment: async () => {
+		const v = h.pendingAdjustment.value;
+		h.pendingAdjustment.value = null; // consumed, same contract as the native side
+		return v;
+	}
 }));
 
 import { workout } from '$lib/stores/workout.svelte';
@@ -118,6 +125,7 @@ beforeEach(() => {
 	h.exercises.length = 0;
 	h.exercises.push(press);
 	h.upserted.length = 0;
+	h.pendingAdjustment.value = null;
 });
 
 afterEach(() => {
@@ -279,5 +287,36 @@ describe('superset round-cycling', () => {
 		workout.toggleSet(0, 0);
 		expect([workout.activeEx, workout.activeSet]).toEqual([0, 1]); // next set, same exercise
 		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+	});
+});
+
+describe('interactive Live Activity reconciliation', () => {
+	it('applies a pending +30s adjustment made from the Dynamic Island on resume', async () => {
+		// rest began 30s ago against a 60s seed → 30s left; the Island's +30 button
+		// extended it to end 60s from BASE (i.e. 60s remaining from "now")
+		const endTimeMs = BASE + 60_000;
+		h.pendingAdjustment.value = { endTimeMs, skipped: false };
+		backing.set(RESUME_KEY, JSON.stringify(resumeSnapshot({ restStartedAtMs: BASE - 30_000 })));
+		workout.restore();
+		await flush();
+		expect(workout.restForSet).not.toBeNull();
+		expect(workout.restRemaining).toBeCloseTo(60, 0);
+	});
+
+	it('applies a pending skip made from the Dynamic Island on resume', async () => {
+		h.pendingAdjustment.value = { endTimeMs: BASE, skipped: true };
+		backing.set(RESUME_KEY, JSON.stringify(resumeSnapshot({ restStartedAtMs: BASE - 30_000 })));
+		workout.restore();
+		await flush();
+		expect(workout.restForSet).toBeNull();
+		expect(workout.restRunning).toBe(false);
+	});
+
+	it('is a no-op with nothing pending', async () => {
+		backing.set(RESUME_KEY, JSON.stringify(resumeSnapshot({ restStartedAtMs: BASE - 30_000, restSeedSec: 60 })));
+		workout.restore();
+		await flush();
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		expect(workout.restRemaining).toBeCloseTo(30, 0);
 	});
 });

@@ -11,7 +11,8 @@ public class RestActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 	public let jsName = "RestActivity"
 	public let pluginMethods: [CAPPluginMethod] = [
 		CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
-		CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise)
+		CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
+		CAPPluginMethod(name: "readPendingAdjustment", returnType: CAPPluginReturnPromise)
 	]
 
 	@objc func start(_ call: CAPPluginCall) {
@@ -41,6 +42,16 @@ public class RestActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 	@objc func end(_ call: CAPPluginCall) {
 		RestActivityPlugin.endAllActivities()
 		call.resolve()
+	}
+
+	/// Consumes (reads + clears) an add-time/skip event left by a Live Activity
+	/// button tap while the app was backgrounded, so the JS timer can reconcile.
+	@objc func readPendingAdjustment(_ call: CAPPluginCall) {
+		guard let adj = RestAdjustmentStore.consume() else {
+			call.resolve(["present": false])
+			return
+		}
+		call.resolve(["present": true, "endTimeMs": adj.endTimeMs, "skipped": adj.skipped])
 	}
 
 	static func endAllActivities() {
