@@ -67,7 +67,11 @@ no black gap. *Verified in the simulator.*
 
 ---
 
-## Open questions for you
-- **App name:** unify "BuffUp" (store) and "Buffy" (home screen)? Say which you want.
+## Notes
+- **App name is intentional:** the App Store / TestFlight listing is **"BuffUp"** (the name
+  "Buffy" was already taken on the store); the home-screen app name stays **"Buffy"**. These
+  are allowed to differ — no change needed.
+
+## Open question for you
 - Anything off in the Live Activity styling (color, layout, what it shows)? It's easy to
   tweak — it currently shows the exercise name + countdown + "REST".
