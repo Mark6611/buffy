@@ -17,6 +17,24 @@
 	let restSec = $state(90);
 	let muscle = $state('');
 
+	// Kept in sync with the muscle groups already used across the app (the seed
+	// catalog + analytics.ts's body-map / push-pull groupings) — not an invented list.
+	const MUSCLES = [
+		'Chest',
+		'Shoulders',
+		'Back',
+		'Lats',
+		'Traps',
+		'Biceps',
+		'Triceps',
+		'Abs',
+		'Quads',
+		'Hamstrings',
+		'Glutes',
+		'Calves',
+		'Adductors'
+	];
+
 	const equips: Equipment[] = ['barbell', 'dumbbell', 'cable', 'machine', 'kettlebell', 'bodyweight', 'cardio'];
 	const tts: { v: TrackingType; t: string; s: string }[] = [
 		{ v: 'weight_reps', t: 'Weight × reps', s: 'logs weight + reps · auto-progression' },
@@ -107,9 +125,20 @@
 					<input class="inp" type="text" style="width:64px" value={mmss(restSec)} onchange={(e) => (restSec = parseMmss(e.currentTarget.value))} />
 				</div>
 				<div class="divider"></div>
-				<div class="row" style="justify-content:space-between">
+				<div class="row" style="justify-content:space-between;position:relative">
 					<div style="font-weight:500">Primary muscle</div>
-					<input class="inp" type="text" style="width:96px" placeholder="Chest" bind:value={muscle} />
+					<div style="display:flex;align-items:center;gap:6px">
+						<span class="mono" style="color:{muscle ? 'var(--ink)' : 'var(--ink-3)'}">{muscle || 'Select'}</span>
+						<Icon name="chevD" size={16} color="var(--ink-3)" />
+					</div>
+					<select
+						bind:value={muscle}
+						aria-label="Primary muscle"
+						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px"
+					>
+						<option value="">No primary muscle</option>
+						{#each MUSCLES as m (m)}<option value={m}>{m}</option>{/each}
+					</select>
 				</div>
 			</div>
 		</div>
