@@ -305,3 +305,51 @@ export async function writeAutoBackup(content: string): Promise<boolean> {
 		return false;
 	}
 }
+
+// ───────────────────────────────────────────────────────────── iCloud sync
+// CloudKit private-database mirror (native only — no web equivalent; there's
+// no separate login, it rides the device's signed-in iCloud account).
+export interface CloudRecord {
+	id: string;
+	updatedAt: string;
+	json: string;
+}
+interface CloudSyncBridge {
+	isAvailable(): Promise<{ available: boolean }>;
+	pull(opts: { type: string }): Promise<{ recordsJson: string }>;
+	push(opts: { type: string; recordsJson: string }): Promise<void>;
+}
+const CloudSync = registerPlugin<CloudSyncBridge>('CloudSync');
+
+/** Is iCloud available (device signed in, capability enabled)? False on web. */
+export async function cloudSyncIsAvailable(): Promise<boolean> {
+	if (!isNative) return false;
+	try {
+		return (await CloudSync.isAvailable()).available;
+	} catch {
+		return false;
+	}
+}
+
+/** Fetch every CloudKit record of `type` from the private database. */
+export async function cloudSyncPull(type: string): Promise<CloudRecord[]> {
+	if (!isNative) return [];
+	try {
+		const { recordsJson } = await CloudSync.pull({ type });
+		return JSON.parse(recordsJson) as CloudRecord[];
+	} catch {
+		return [];
+	}
+}
+
+/** Upsert records of `type` to CloudKit — overwrites the server copy (the merge
+ *  decision already happened on the JS side before this is called). */
+export async function cloudSyncPush(type: string, records: CloudRecord[]): Promise<boolean> {
+	if (!isNative || records.length === 0) return true;
+	try {
+		await CloudSync.push({ type, recordsJson: JSON.stringify(records) });
+		return true;
+	} catch {
+		return false;
+	}
+}

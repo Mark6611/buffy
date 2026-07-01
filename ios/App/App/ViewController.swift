@@ -8,5 +8,6 @@ class ViewController: CAPBridgeViewController {
 		bridge?.registerPluginInstance(RestActivityPlugin())
 		bridge?.registerPluginInstance(WidgetDataPlugin())
 		bridge?.registerPluginInstance(HealthPlugin())
+		bridge?.registerPluginInstance(CloudSyncPlugin())
 	}
 }

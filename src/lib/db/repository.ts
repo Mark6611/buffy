@@ -36,4 +36,15 @@ export interface Repository {
 
 	/** wipe all exercises, templates and sessions (used by restore → replace) */
 	clearAll(): Promise<void>;
+
+	// --- iCloud sync only ---
+	// Every upsertX above always stamps updatedAt = now, because a normal write IS a
+	// fresh local edit. Applying a record PULLED from iCloud is different: its
+	// updatedAt is the very thing last-write-wins compares across devices, so writing
+	// it through upsertX would re-stamp it "now" on every device and make every synced
+	// record look like it just changed everywhere — breaking the comparison it's meant
+	// to power. These three preserve the timestamp exactly as given.
+	applySyncedExercise(ex: Exercise): Promise<void>;
+	applySyncedTemplate(t: Template): Promise<void>;
+	applySyncedSession(s: WorkoutSession): Promise<void>;
 }

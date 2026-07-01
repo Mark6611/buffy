@@ -131,5 +131,6 @@ export interface Settings {
 	increments: ProgressionIncrements;
 	hapticAtRestEnd: boolean;
 	writeToHealth: boolean;
+	cloudSyncEnabled: boolean;
 	// weight unit is always kg (fixed) — no field needed
 }

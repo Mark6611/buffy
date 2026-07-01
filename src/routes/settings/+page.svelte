@@ -3,11 +3,21 @@
 	import { getRepository } from '$lib/db';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { mmss, parseMmss } from '$lib/format';
-	import { isNative, requestHealthAuthorization } from '$lib/native';
+	import { isNative, requestHealthAuthorization, cloudSyncIsAvailable } from '$lib/native';
+	import { runCloudSync } from '$lib/cloudSync';
+	import { relativeDay } from '$lib/format';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
-	onMount(() => settings.load());
+	const LAST_SYNC_KEY = 'buffy:lastCloudSync';
+	let syncing = $state(false);
+	let syncMessage = $state('');
+	let lastSync = $state<string | null>(null);
+
+	onMount(() => {
+		settings.load();
+		lastSync = localStorage.getItem(LAST_SYNC_KEY);
+	});
 
 	const s = $derived(settings.current);
 
@@ -26,6 +36,37 @@
 			if (!granted) return; // permission denied — leave the toggle off
 		}
 		settings.save({ writeToHealth: next });
+	}
+
+	async function toggleCloudSync() {
+		const next = !s.cloudSyncEnabled;
+		if (next) {
+			if (!(await cloudSyncIsAvailable())) {
+				syncMessage = 'iCloud isn’t available — check you’re signed in under iOS Settings.';
+				return;
+			}
+			await settings.save({ cloudSyncEnabled: true });
+			void syncNow(); // first sync right away
+		} else {
+			settings.save({ cloudSyncEnabled: false });
+		}
+	}
+
+	async function syncNow() {
+		if (syncing) return;
+		syncing = true;
+		syncMessage = '';
+		const result = await runCloudSync();
+		syncing = false;
+		if (result.ok) {
+			const now = new Date().toISOString();
+			localStorage.setItem(LAST_SYNC_KEY, now);
+			lastSync = now;
+			syncMessage =
+				result.pulled || result.pushed ? `Synced — ${result.pulled} pulled, ${result.pushed} pushed.` : 'Already up to date.';
+		} else {
+			syncMessage = result.reason ?? 'Sync failed.';
+		}
 	}
 
 	async function exportData() {
@@ -123,6 +164,31 @@
 							<button class="toggle {s.writeToHealth ? 'on' : ''}" aria-label="toggle" onclick={toggleHealth}><i></i></button>
 						</div>
 					</div>
+				</div>
+
+				<div>
+					<div class="h-sec" style="margin-bottom:8px">iCloud Sync</div>
+					<div class="card">
+						<div class="row" style="justify-content:space-between">
+							<div><div style="font-weight:500">Sync with iCloud</div><div class="txt-sm">your data, mirrored to your other devices</div></div>
+							<button class="toggle {s.cloudSyncEnabled ? 'on' : ''}" aria-label="toggle" onclick={toggleCloudSync}><i></i></button>
+						</div>
+						{#if s.cloudSyncEnabled}
+							<div class="divider"></div>
+							<div class="row" style="justify-content:space-between">
+								<div>
+									<div style="font-weight:500">Last synced</div>
+									<div class="txt-sm mono">{lastSync ? relativeDay(lastSync) : 'never'}</div>
+								</div>
+								<button class="btn btn-ghost btn-sm" style="height:36px" onclick={syncNow} disabled={syncing}>
+									{syncing ? 'Syncing…' : 'Sync now'}
+								</button>
+							</div>
+						{/if}
+					</div>
+					{#if syncMessage}
+						<div class="txt-sm" style="margin-top:8px;padding-inline:4px;color:var(--ink-2)">{syncMessage}</div>
+					{/if}
 				</div>
 			{/if}
 

@@ -121,7 +121,56 @@ the buttons in the simulator this session (a macOS permission gap, not a code is
 one specifically needs your on-device confirmation**: rest running → lock the phone → tap
 +30s on the Lock Screen card → confirm the countdown jumps by 30s; then try skip.*
 
-## Open question for you
+## Build 5 additions
+
+### Swipe left on an exercise → Delete / Swap
+The trash icon is gone — swipe an exercise's header row left during a workout to reveal
+**Swap** and **Delete**. Swap opens the picker to replace that exercise with a different one
+(fresh sets at the new exercise's defaults — the old logged sets don't carry over, since a
+weight logged for one exercise doesn't mean anything for another). Only one row's actions
+stay open at a time. *Verified: real drag-gesture E2E tests (Playwright mouse simulation, not
+just a tap) confirm the swipe opens, Delete removes the exercise, and Swap replaces it —
+run twice back-to-back with no flakiness.*
+
+### Finishing a workout can now update your template
+- **From a template workout:** Finish → **"Update whole template"** (syncs the exercise list
+  + weights to match what you actually did) / **"Update weights only"** (just the numbers,
+  structure untouched) / **"Leave template as-is"**.
+- **From Quick Log:** Finish → **"Save as a template?"** with a name field, so a one-off
+  session becomes reusable.
+*Verified: E2E tests drive the real flow (edit a weight → sync → confirm the template's
+listing shows the new number; quick-log → save → confirm it shows up in My Templates). This
+also caught and fixed a real bug — the first version would have silently corrupted a
+template on save due to a Svelte-reactivity/IndexedDB conflict.*
+
+### Custom exercise: muscle picker instead of free text
+Same native-picker pattern as elsewhere in the app (tap → iOS wheel picker), pulling from
+the muscle groups the app's own Trends analytics already recognize — nothing you pick here
+can go unseen by the body-map / muscle-balance charts.
+
+### iCloud Sync ⚠️ needs your on-device test before you trust it
+**Settings → iCloud Sync → "Sync with iCloud"** — off by default. Mirrors your exercises,
+templates, and sessions to CloudKit's private database (your iCloud account, no separate
+login, nothing I can see). Last-write-wins per record if you use Buffy on two devices.
+
+**Please read this before testing:** while building this, I found and fixed a real crash —
+the first version crashed the *entire app on every single launch*, not just when using sync,
+because it touched CloudKit eagerly at startup. That's fixed (confirmed: the app now launches
+and runs normally). But tapping the toggle itself **still crashes in the iOS Simulator**,
+because CloudKit hard-requires a properly signed, provisioned build to even construct its
+container — the simulator's unsigned dev build can't satisfy that, no matter how the Swift
+code is written. TestFlight builds *are* properly signed and provisioned, so my expectation
+is this works correctly there — but I have not been able to confirm that myself.
+- **Test it cautiously:** tap the toggle once. If it works, great — you'll see "Last synced"
+  and a "Sync now" button appear.
+- **If it crashes:** your data is safe regardless — the crash happens *before* the toggle's
+  setting is ever saved, so it won't loop on relaunch, and nothing about your workout history
+  is touched by this at all. Just tell me and send me what you see (or I can pull the crash
+  log from your device) and I'll dig in with real data instead of guessing.
+
+## Open questions for you
+- iCloud Sync: did it crash on your device, or work? This is the one piece I couldn't fully
+  verify myself this session.
 - Anything off in the Live Activity styling (color, layout, what it shows, button placement)?
   Easy to tweak — it currently shows the exercise name + countdown + "REST" + the two buttons.
 - Widget looks right? It's a small/medium card with streak, volume, sessions, and a next/last

@@ -9,6 +9,7 @@
 	import { getRepository } from '$lib/db';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { writeHealthWorkout } from '$lib/native';
+	import { runCloudSync } from '$lib/cloudSync';
 	import { applyFullSync, applyWeightsOnlySync, buildTemplateFromSession } from '$lib/templateSync';
 	import type { LoggedSet, Template, WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
@@ -42,6 +43,7 @@
 		void refreshWidget();
 		if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
 		if (settings.current.writeToHealth) void writeHealthAfterFinish(id);
+		if (settings.current.cloudSyncEnabled) void runCloudSync();
 
 		const repo = getRepository();
 		const saved = await repo.getSession(id);

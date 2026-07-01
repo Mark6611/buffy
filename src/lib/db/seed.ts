@@ -18,7 +18,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	autoProgression: true,
 	increments: { barbell: 2.5, dumbbellPerSide: 1, machinePin: 5 },
 	hapticAtRestEnd: true,
-	writeToHealth: false // opt-in — first toggle triggers the iOS permission prompt
+	writeToHealth: false, // opt-in — first toggle triggers the iOS permission prompt
+	cloudSyncEnabled: false // opt-in — checks iCloud availability before turning on
 };
 
 // ---- Catalog ----------------------------------------------------------------

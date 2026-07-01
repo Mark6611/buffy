@@ -31,6 +31,7 @@
 		DFFE6D2DB4DB83788B8D9656 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24EB71C798823809720098CF /* ViewController.swift */; };
 		EBEA85E4D5A4C8901016BC40 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */; };
 		EEF134EDC73906B2EA631531 /* RestAdjustmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04F7DC7037BE6F1FC9BEFB0 /* RestAdjustmentStore.swift */; };
+		F74E5771E0A02710608AF937 /* CloudSyncPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84033E342C0F26A197A7292B /* CloudSyncPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +76,7 @@
 		5916855531BAE2811924BFBB /* RestActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestActivityPlugin.swift; path = App/RestActivityPlugin.swift; sourceTree = "<group>"; };
 		6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestActivityAttributes.swift; path = Shared/RestActivityAttributes.swift; sourceTree = "<group>"; };
 		6BE7BF9C116BD7F8C11AA3AD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		84033E342C0F26A197A7292B /* CloudSyncPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudSyncPlugin.swift; path = App/CloudSyncPlugin.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		A04F7DC7037BE6F1FC9BEFB0 /* RestAdjustmentStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestAdjustmentStore.swift; path = Shared/RestAdjustmentStore.swift; sourceTree = "<group>"; };
 		DF47E2123DCC97DDD4C1B9EF /* WidgetSnapshotStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetSnapshotStore.swift; path = Shared/WidgetSnapshotStore.swift; sourceTree = "<group>"; };
@@ -129,6 +131,7 @@
 				0413E4BF7B8FA6F07D6AB355 /* HealthPlugin.swift */,
 				A04F7DC7037BE6F1FC9BEFB0 /* RestAdjustmentStore.swift */,
 				24CEEC7097F043C4F1C0E5D7 /* RestActivityIntents.swift */,
+				84033E342C0F26A197A7292B /* CloudSyncPlugin.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -280,6 +283,7 @@
 				2AF687B922CC4D026FED0EC5 /* WidgetDataPlugin.swift in Sources */,
 				9DAD7ADC76258A8AD599F181 /* HealthPlugin.swift in Sources */,
 				EEF134EDC73906B2EA631531 /* RestAdjustmentStore.swift in Sources */,
+				F74E5771E0A02710608AF937 /* CloudSyncPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

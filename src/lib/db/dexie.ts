@@ -117,4 +117,15 @@ export class DexieRepository implements Repository {
 	async clearAll() {
 		await Promise.all([this.db.exercises.clear(), this.db.templates.clear(), this.db.sessions.clear()]);
 	}
+
+	// --- iCloud sync only — see the interface doc for why these skip the timestamp stamp ---
+	async applySyncedExercise(ex: Exercise) {
+		await this.db.exercises.put(ex);
+	}
+	async applySyncedTemplate(t: Template) {
+		await this.db.templates.put(t);
+	}
+	async applySyncedSession(s: WorkoutSession) {
+		await this.db.sessions.put(s);
+	}
 }
