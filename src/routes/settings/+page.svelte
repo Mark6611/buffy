@@ -3,6 +3,7 @@
 	import { getRepository } from '$lib/db';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { mmss, parseMmss } from '$lib/format';
+	import { isNative, requestHealthAuthorization } from '$lib/native';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
@@ -16,6 +17,15 @@
 	function saveIncrement(key: 'barbell' | 'dumbbellPerSide' | 'machinePin', v: string) {
 		const n = parseFloat(v);
 		if (Number.isFinite(n)) settings.save({ increments: { ...s.increments, [key]: n } });
+	}
+
+	async function toggleHealth() {
+		const next = !s.writeToHealth;
+		if (next) {
+			const granted = await requestHealthAuthorization();
+			if (!granted) return; // permission denied — leave the toggle off
+		}
+		settings.save({ writeToHealth: next });
 	}
 
 	async function exportData() {
@@ -103,6 +113,18 @@
 					</div>
 				</div>
 			</div>
+
+			{#if isNative}
+				<div>
+					<div class="h-sec" style="margin-bottom:8px">Apple Health</div>
+					<div class="card">
+						<div class="row" style="justify-content:space-between">
+							<div><div style="font-weight:500">Write workouts to Health</div><div class="txt-sm">saves duration to Apple Health on finish</div></div>
+							<button class="toggle {s.writeToHealth ? 'on' : ''}" aria-label="toggle" onclick={toggleHealth}><i></i></button>
+						</div>
+					</div>
+				</div>
+			{/if}
 
 			<div>
 				<div class="h-sec" style="margin-bottom:8px">Data</div>

@@ -126,5 +126,6 @@ export interface Settings {
 	autoProgression: boolean;
 	increments: ProgressionIncrements;
 	hapticAtRestEnd: boolean;
+	writeToHealth: boolean;
 	// weight unit is always kg (fixed) — no field needed
 }

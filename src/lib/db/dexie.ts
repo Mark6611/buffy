@@ -88,8 +88,9 @@ export class DexieRepository implements Repository {
 	async getSettings() {
 		const row = await this.db.settings.get(SETTINGS_KEY);
 		if (!row) return { ...DEFAULT_SETTINGS };
+		// merge over defaults so a row saved before a new field existed still has it
 		const { id: _id, ...rest } = row;
-		return rest;
+		return { ...DEFAULT_SETTINGS, ...rest };
 	}
 	async saveSettings(s: Settings) {
 		await this.db.settings.put({ ...s, id: SETTINGS_KEY });

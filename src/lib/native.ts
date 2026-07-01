@@ -209,6 +209,65 @@ export async function endRestLiveActivity(): Promise<void> {
  * included in the device's iCloud backup and — with UIFileSharingEnabled — is
  * visible in the Files app, so data survives device loss/restore. No entitlement.
  */
+// ───────────────────────────────────────────────────────── home-screen widget
+interface WidgetDataBridge {
+	write(snapshot: {
+		streakDays: number;
+		volumeThisWeekKg: number;
+		sessionsThisWeek: number;
+		nextOrLastTitle: string;
+		isNext: boolean;
+	}): Promise<void>;
+}
+const WidgetData = registerPlugin<WidgetDataBridge>('WidgetData');
+
+/** Push a fresh summary to the home-screen widget (native only). */
+export async function writeWidgetSnapshot(snapshot: {
+	streakDays: number;
+	volumeThisWeekKg: number;
+	sessionsThisWeek: number;
+	nextOrLastTitle: string;
+	isNext: boolean;
+}): Promise<void> {
+	if (!isNative) return;
+	try {
+		await WidgetData.write(snapshot);
+	} catch {
+		/* best-effort */
+	}
+}
+
+// ─────────────────────────────────────────────────────────────── Apple Health
+interface HealthBridge {
+	isAvailable(): Promise<{ available: boolean }>;
+	requestAuthorization(): Promise<{ granted: boolean }>;
+	writeWorkout(opts: { startTime: number; endTime: number }): Promise<void>;
+}
+const Health = registerPlugin<HealthBridge>('Health');
+
+/** Prompt the standard iOS Health permission sheet (native only). */
+export async function requestHealthAuthorization(): Promise<boolean> {
+	if (!isNative) return false;
+	try {
+		const { available } = await Health.isAvailable();
+		if (!available) return false;
+		const { granted } = await Health.requestAuthorization();
+		return granted;
+	} catch {
+		return false;
+	}
+}
+
+/** Write a finished workout to Apple Health as strength training (native only). */
+export async function writeHealthWorkout(startMs: number, endMs: number): Promise<void> {
+	if (!isNative) return;
+	try {
+		await Health.writeWorkout({ startTime: startMs, endTime: endMs });
+	} catch {
+		/* best-effort — permission may have been denied */
+	}
+}
+
 export async function writeAutoBackup(content: string): Promise<boolean> {
 	if (!isNative) return false;
 	try {

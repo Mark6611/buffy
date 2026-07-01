@@ -5,6 +5,10 @@
 	import { mmss, kg, parseMmss } from '$lib/format';
 	import { platesPerSide, formatPerSide } from '$lib/plates';
 	import { autoBackup } from '$lib/data';
+	import { syncWidget } from '$lib/widgetSync';
+	import { getRepository } from '$lib/db';
+	import { settings } from '$lib/stores/settings.svelte';
+	import { writeHealthWorkout } from '$lib/native';
 	import type { LoggedSet } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
@@ -21,8 +25,22 @@
 
 	async function finish() {
 		const id = await workout.finish();
-		if (id) void autoBackup(); // native: snapshot all data to Documents after a logged workout
+		if (id) {
+			void autoBackup(); // native: snapshot all data to Documents after a logged workout
+			void refreshWidget();
+			if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
+			if (settings.current.writeToHealth) void writeHealthAfterFinish(id);
+		}
 		goto(id ? `/history/${id}` : '/');
+	}
+	async function refreshWidget() {
+		const repo = getRepository();
+		const [sessions, templates] = await Promise.all([repo.listSessions(), repo.listTemplates()]);
+		await syncWidget(sessions, templates);
+	}
+	async function writeHealthAfterFinish(id: string) {
+		const s = await getRepository().getSession(id);
+		if (s?.endedAt) await writeHealthWorkout(Date.parse(s.startedAt), Date.parse(s.endedAt));
 	}
 	function close() {
 		if (confirm('Discard this workout? Nothing will be saved.')) {

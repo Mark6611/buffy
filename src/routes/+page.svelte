@@ -5,6 +5,7 @@
 	import { templateDerived } from '$lib/compute';
 	import { durationLabel, volK } from '$lib/format';
 	import { kpis } from '$lib/analytics';
+	import { syncWidget } from '$lib/widgetSync';
 	import type { Template, Exercise, WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
@@ -23,6 +24,7 @@
 		sessions = s;
 		byId = new Map(ex.map((e) => [e.id, e]));
 		loaded = true;
+		void syncWidget(s, t); // keep the home-screen widget fresh (native no-op on web)
 	});
 
 	const k = $derived(kpis(sessions));

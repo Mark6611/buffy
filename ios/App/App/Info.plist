@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Buffy can save finished workouts to Health so they show up alongside your other activity.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Buffy can save finished workouts to Health so they show up alongside your other activity.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

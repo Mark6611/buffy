@@ -17,7 +17,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	defaultRestSec: 90,
 	autoProgression: true,
 	increments: { barbell: 2.5, dumbbellPerSide: 1, machinePin: 5 },
-	hapticAtRestEnd: true
+	hapticAtRestEnd: true,
+	writeToHealth: false // opt-in — first toggle triggers the iOS permission prompt
 };
 
 // ---- Catalog ----------------------------------------------------------------
