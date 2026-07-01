@@ -39,6 +39,8 @@ export interface Exercise {
 	defaultRestSec?: number;
 	/** machine/cable setup memo, e.g. "Fly High 16/18" */
 	setupNote?: string;
+	/** ISO — stamped by the repository on every write; powers iCloud sync merge */
+	updatedAt?: string;
 }
 
 /** A planned set inside a template. Which fields apply depends on the exercise's trackingType. */
@@ -113,6 +115,8 @@ export interface WorkoutSession {
 	title?: string;
 	exercises: LoggedExercise[];
 	note?: string;
+	/** ISO — stamped by the repository on every write; powers iCloud sync merge */
+	updatedAt?: string;
 }
 
 export interface ProgressionIncrements {

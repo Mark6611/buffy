@@ -30,6 +30,22 @@ class BuffyDB extends Dexie {
 		this.version(2).stores({
 			sessions: 'id, startedAt, sourceTemplateId, endedAt'
 		});
+		// v3: exercises + sessions gain updatedAt (iCloud sync merge key, mirrors
+		// templates' existing field) — backfill existing rows so nothing is undefined.
+		this.version(3)
+			.stores({
+				exercises: 'id, name, equipment, trackingType, updatedAt',
+				sessions: 'id, startedAt, sourceTemplateId, endedAt, updatedAt'
+			})
+			.upgrade(async (tx) => {
+				const now = new Date().toISOString();
+				await tx.table('exercises').toCollection().modify((e) => {
+					if (!e.updatedAt) e.updatedAt = now;
+				});
+				await tx.table('sessions').toCollection().modify((s) => {
+					if (!s.updatedAt) s.updatedAt = now;
+				});
+			});
 		// If another tab upgrades the schema, close this connection rather than block it.
 		this.on('versionchange', () => this.close());
 	}
@@ -46,7 +62,9 @@ export class DexieRepository implements Repository {
 		return this.db.exercises.get(id);
 	}
 	async upsertExercise(ex: Exercise) {
-		await this.db.exercises.put(ex);
+		// stamp centrally — sync merge depends on every write bumping this, and
+		// there are too many call sites to trust each one to remember
+		await this.db.exercises.put({ ...ex, updatedAt: new Date().toISOString() });
 	}
 	async deleteExercise(id: ID) {
 		await this.db.exercises.delete(id);
@@ -60,7 +78,7 @@ export class DexieRepository implements Repository {
 		return this.db.templates.get(id);
 	}
 	async upsertTemplate(t: Template) {
-		await this.db.templates.put(t);
+		await this.db.templates.put({ ...t, updatedAt: new Date().toISOString() });
 	}
 	async deleteTemplate(id: ID) {
 		await this.db.templates.delete(id);
@@ -74,7 +92,7 @@ export class DexieRepository implements Repository {
 		return this.db.sessions.get(id);
 	}
 	async upsertSession(s: WorkoutSession) {
-		await this.db.sessions.put(s);
+		await this.db.sessions.put({ ...s, updatedAt: new Date().toISOString() });
 	}
 	async deleteSession(id: ID) {
 		await this.db.sessions.delete(id);
