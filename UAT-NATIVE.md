@@ -1,11 +1,13 @@
 # Buffy — Native UAT (TestFlight)
 
-Everything below is built, type-checked (0 errors), tested (37/37), and runs in the
-simulator. Install the latest build via the **TestFlight** app (the App Store Connect
+Everything below is built, type-checked (0 errors), tested (52 unit + 2 E2E), and CI-guarded
+on every push. Install the latest build via the **TestFlight** app (the App Store Connect
 listing is named **"BuffUp"**; the app on your home screen is **"Buffy"**).
 
-> **Build:** `1.0 (2)` · bundle `com.mark.buffy` · Team `ZCS5Y23P62`
-> Build 1 = the app with no native extras (pipeline validation). Build 2 = everything below.
+> **Build:** `1.0 (4)` · bundle `com.mark.buffy` · Team `ZCS5Y23P62`
+> Build 1 = pipeline validation (no native extras). Build 2 = timer/notification/splash/haptic
+> features + editable timers. Build 3 = superset round-cycling, notes, plate calculator,
+> native auto-backup. **Build 4 = home-screen widget, Apple Health, interactive Live Activity.**
 
 ---
 
@@ -57,13 +59,18 @@ no black gap. *Verified in the simulator.*
 
 ---
 
-## How to drive a full test in ~2 minutes
-1. Open Buffy → tap a template → **Start**.
-2. Tap a set's circle to log it → rest banner appears, **Live Activity starts**.
-3. **Lock the phone** → see the rest card on the Lock Screen; glance at the Dynamic Island.
-4. Wait for the countdown to hit zero → **notification fires** with sound/buzz.
-5. Unlock, complete another set, **Finish**.
-6. Mid-workout, **force-quit** the app and reopen → confirm it **resumes**.
+## How to drive a full test in ~5 minutes
+1. **Settings** → turn on **Write workouts to Health** → allow the permission sheet.
+2. Open Buffy → tap a template → **Start**.
+3. Tap a set's circle to log it → rest banner appears, **Live Activity starts**.
+4. **Lock the phone** → see the rest card on the Lock Screen with **+30s / skip** buttons;
+   glance at the Dynamic Island. Tap **+30s**, confirm the countdown jumps.
+5. Wait for the countdown to hit zero → **notification fires** with sound/buzz.
+6. Unlock, complete another set, **Finish**.
+7. Mid-workout, **force-quit** the app and reopen → confirm it **resumes**.
+8. Back at Home, long-press → **+** → add the **Buffy widget** → confirm it shows this
+   session's streak/volume.
+9. Open the **Health** app → Browse → Workouts → confirm today's session is there.
 
 ---
 
@@ -84,15 +91,38 @@ no black gap. *Verified in the simulator.*
   Documents, visible in **Files → On My iPhone → Buffy** and covered by your device's iCloud
   backup. The Backup screen shows "Auto-backup … saved to Files".
 
-## Staged for a focused follow-up
-Each of these is a substantial native feature with its own entitlement + device testing, so I
-staged them rather than rush under one session:
-- **Home-screen widget** (streak / weekly volume) — needs an App Group to share data app→widget.
-- **Apple Health** write — needs the HealthKit capability, usage strings, and a permission flow.
-- **Interactive Live Activity** (+time / skip from the Dynamic Island) — needs App Intents + shared state.
-- **Full iCloud Drive roaming** — today's auto-backup covers device loss; cross-device roaming
-  needs the iCloud capability + a portal container (the part with archive/signing risk).
+## Build 4 additions
+
+### Home-screen widget
+Long-press your home screen → **+** → **Buffy** → add the small or medium widget. Shows your
+streak, this-week volume, session count, and either "Next up: [template]" (the template
+you've trained least recently) or "Last: [title]" if you haven't got templates yet. It
+refreshes itself after every finished workout and whenever you open the app.
+*Verified: compiles and the widget target embeds/signs correctly. Please confirm on-device
+that it actually adds to the home screen and shows real data after a workout — this needs a
+real widget gallery, which the simulator only partially represents.*
+
+### Apple Health (opt-in)
+**Settings → Apple Health → "Write workouts to Health"** — off by default. Turning it on
+triggers the standard iOS Health permission sheet; once granted, every finished workout is
+saved to Health as strength training (duration only — Buffy doesn't estimate calories).
+*Verified: compiles clean, entitlement + Info.plist usage strings are in place. Confirm the
+permission sheet appears and a session shows up in the Health app after a workout.*
+
+### Interactive Live Activity — +30s / skip from outside the app ⭐
+The rest countdown on the Lock Screen and Dynamic Island now has two buttons: **+30s** and
+**skip** — tap them without opening the app. Works even if you're in another app or the
+phone's locked; when you come back to Buffy, the in-app timer catches up to match whatever
+you did from outside.
+*Partially verified: the underlying mechanism (ActivityKit + a shared App Group file) is the
+same one already confirmed working for the base Live Activity countdown, and the reconcile
+logic that catches the timer up has 3 dedicated unit tests. I was not able to physically tap
+the buttons in the simulator this session (a macOS permission gap, not a code issue) — **this
+one specifically needs your on-device confirmation**: rest running → lock the phone → tap
++30s on the Lock Screen card → confirm the countdown jumps by 30s; then try skip.*
 
 ## Open question for you
-- Anything off in the Live Activity styling (color, layout, what it shows)? It's easy to
-  tweak — it currently shows the exercise name + countdown + "REST".
+- Anything off in the Live Activity styling (color, layout, what it shows, button placement)?
+  Easy to tweak — it currently shows the exercise name + countdown + "REST" + the two buttons.
+- Widget looks right? It's a small/medium card with streak, volume, sessions, and a next/last
+  workout line — happy to adjust the layout or add a third field (e.g. last workout date).
