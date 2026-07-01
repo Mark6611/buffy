@@ -11,6 +11,11 @@
 	import Thumb from '$lib/components/Thumb.svelte';
 
 	const to = $derived($page.url.searchParams.get('to') ?? 'workout');
+	const swapIndex = $derived.by(() => {
+		const raw = $page.url.searchParams.get('swap');
+		const n = raw != null ? Number(raw) : NaN;
+		return Number.isFinite(n) ? n : null;
+	});
 	let all = $state<Exercise[]>([]);
 	let q = $state('');
 	let filter = $state('All');
@@ -30,6 +35,7 @@
 
 	function pick(ex: Exercise) {
 		if (to === 'tpl') editor.addExercise(ex);
+		else if (swapIndex != null) workout.swapExercise(swapIndex, ex);
 		else workout.addExercise(ex);
 		history.back();
 	}
@@ -44,7 +50,7 @@
 <div class="screen">
 	<div class="topbar">
 		<button class="icon-btn" onclick={() => history.back()} aria-label="Back"><Icon name="back" size={20} /></button>
-		<div class="topbar-title">Add Exercise</div>
+		<div class="topbar-title">{swapIndex != null ? 'Swap Exercise' : 'Add Exercise'}</div>
 		<div style="width:36px"></div>
 	</div>
 	<div class="screen-body">

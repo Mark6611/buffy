@@ -168,6 +168,12 @@ body {
   background: var(--accent-tint); padding: 3px 8px; border-radius: 7px; margin-top: 6px;
 }
 
+.swipe-btn {
+  width: 76px; border: none; color: #fff; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 600;
+}
+
 .settable { width: 100%; border-collapse: collapse; }
 .settable th {
   font-family: var(--font-ui); font-size: 11px; font-weight: 600; letter-spacing: 0.4px;

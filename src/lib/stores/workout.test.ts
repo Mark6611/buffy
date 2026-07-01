@@ -386,3 +386,53 @@ describe('removeExercise', () => {
 		expect(workout.session?.exercises).toHaveLength(1);
 	});
 });
+
+describe('swapExercise', () => {
+	it('replaces the exercise with a fresh set list at the new exercise defaults', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // 3 sets, press defaults
+		workout.toggleSet(0, 0); // log one set of press
+		workout.swapExercise(0, curl);
+		const le = workout.session?.exercises[0];
+		expect(le?.exerciseId).toBe('curl');
+		expect(le?.sets).toHaveLength(3); // same set count as what it replaced
+		expect(le?.sets.every((s) => !s.completed)).toBe(true); // nothing carries over as "done"
+		expect(le?.sets[0].reps).toBe(curl.defaultTargetReps);
+		expect(workout.meta[0]).toBe(curl);
+		expect(workout.plannedRest[0]).toEqual([curl.defaultRestSec, curl.defaultRestSec, curl.defaultRestSec]);
+	});
+
+	it('preserves the set count of the exercise it replaces', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.addSet(0);
+		workout.addSet(0); // now 5 sets
+		workout.swapExercise(0, curl);
+		expect(workout.session?.exercises[0].sets).toHaveLength(5);
+	});
+
+	it('clears an in-progress rest for the exercise being swapped', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0); // starts a rest against exercise 0
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		workout.swapExercise(0, curl);
+		expect(workout.restForSet).toBeNull();
+		expect(workout.restRunning).toBe(false);
+	});
+
+	it('drops the stale suggestion for the exerciseId that was swapped out', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.suggestions['press'] = null; // simulate a previously-loaded suggestion
+		workout.swapExercise(0, curl);
+		expect('press' in workout.suggestions).toBe(false);
+	});
+
+	it('is a no-op past the end of the exercise list', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.swapExercise(5, curl);
+		expect(workout.session?.exercises[0].exerciseId).toBe('press');
+	});
+});

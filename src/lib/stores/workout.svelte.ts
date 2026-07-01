@@ -348,6 +348,53 @@ class WorkoutStore {
 		this.restLiveSync();
 	}
 
+	/** Swap the exercise at a slot for a different one — a fresh set list at the new
+	 *  exercise's defaults (same set count), since logged weight/reps only make sense
+	 *  for the exercise they were logged against. */
+	swapExercise(exIndex: number, newEx: Exercise) {
+		const s = this.session;
+		const le = s?.exercises[exIndex];
+		if (!s || !le) return;
+		const removedId = le.exerciseId;
+		const setCount = le.sets.length || 3;
+
+		this.meta[exIndex] = newEx;
+		this.plannedRest[exIndex] = Array.from({ length: setCount }, () => newEx.defaultRestSec ?? settings.current.defaultRestSec);
+		s.exercises[exIndex] = {
+			exerciseId: newEx.id,
+			groupId: le.groupId ?? null,
+			setupNote: newEx.setupNote,
+			sets: Array.from({ length: setCount }, (_, i) => ({
+				index: i,
+				completed: false,
+				reps: newEx.defaultTargetReps,
+				perSide: newEx.loadType === 'per_side' ? true : undefined
+			}))
+		};
+		if (!s.exercises.some((e) => e.exerciseId === removedId)) delete this.suggestions[removedId];
+
+		if (this.restForSet?.ex === exIndex) {
+			// the exercise identity changed mid-rest — nothing left to record the old rest against
+			cancelRestEndAlert();
+			this.restRunning = false;
+			this.restAccumSec = 0;
+			this.restStartedAtMs = 0;
+			this.restSeedSec = 0;
+			this.restForSet = null;
+			this.restHapticFired = false;
+		}
+		this.setActiveToFirstIncomplete();
+		this.restLiveSync();
+		void this.hydrateSuggestionFor(newEx);
+	}
+
+	/** Fetch (or clear) the auto-progression suggestion for one exercise — used after a swap. */
+	private async hydrateSuggestionFor(ex: Exercise) {
+		if (!settings.current.autoProgression) return;
+		const last = await getRepository().lastSessionForExercise(ex.id);
+		this.suggestions[ex.id] = computeSuggestion(ex, last);
+	}
+
 	addSet(exIndex: number) {
 		const le = this.session?.exercises[exIndex];
 		if (!le) return;

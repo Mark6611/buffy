@@ -14,6 +14,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import RestBanner from '$lib/components/RestBanner.svelte';
+	import SwipeActions from '$lib/components/SwipeActions.svelte';
 
 	onMount(() => {
 		if (!workout.active) goto('/');
@@ -117,6 +118,21 @@
 			: `Remove ${name} from this workout?`;
 		if (confirm(msg)) workout.removeExercise(exIndex);
 	}
+	function swapExercise(exIndex: number) {
+		const le = workout.session?.exercises[exIndex];
+		const hasLoggedSets = !!le?.sets.some((s) => s.completed);
+		const name = workout.meta[exIndex]?.name ?? 'this exercise';
+		if (hasLoggedSets && !confirm(`Swap ${name}? Sets you've already logged for it will be lost.`)) return;
+		goto(`/picker?to=workout&swap=${exIndex}`);
+	}
+
+	// Swipeable exercise-header rows: opening one closes any other that's open.
+	let swipeRefs: (SwipeActions | undefined)[] = $state([]);
+	function closeOtherSwipes(exIndex: number) {
+		swipeRefs.forEach((r, i) => {
+			if (i !== exIndex) r?.close();
+		});
+	}
 </script>
 
 {#snippet restCell(exIndex: number, s: number, set: LoggedSet)}
@@ -149,24 +165,35 @@
 					{@const tt = ex?.trackingType ?? 'weight_reps'}
 					{@const sg = workout.suggestions[le.exerciseId]}
 					<div class="ex-block">
-						<div class="ex-head">
-							<Thumb equip={ex?.equipment ?? 'dumbbell'} />
-							<div class="ex-title">
-								<div class="ex-name">{ex?.name}</div>
-								<div class="ex-meta">
-									{le.sets.length} sets{#if tt === 'weight_reps' && !bw} · target {ex?.defaultTargetReps} reps{/if}
-									{#if tt === 'time_hold'}<span class="tt-badge" style="margin-left:6px">time-hold</span>{/if}
-									{#if tt === 'cardio'}<span class="tt-badge" style="margin-left:6px">cardio · log-only</span>{/if}
-									{#if bw}<span class="tt-badge" style="margin-left:6px">bodyweight</span>{/if}
+						<SwipeActions bind:this={swipeRefs[exIndex]} onOpen={() => closeOtherSwipes(exIndex)}>
+							{#snippet children()}
+								<div class="ex-head">
+									<Thumb equip={ex?.equipment ?? 'dumbbell'} />
+									<div class="ex-title">
+										<div class="ex-name">{ex?.name}</div>
+										<div class="ex-meta">
+											{le.sets.length} sets{#if tt === 'weight_reps' && !bw} · target {ex?.defaultTargetReps} reps{/if}
+											{#if tt === 'time_hold'}<span class="tt-badge" style="margin-left:6px">time-hold</span>{/if}
+											{#if tt === 'cardio'}<span class="tt-badge" style="margin-left:6px">cardio · log-only</span>{/if}
+											{#if bw}<span class="tt-badge" style="margin-left:6px">bodyweight</span>{/if}
+										</div>
+										{#if le.setupNote}
+											<span class="setup-note"><Icon name="cog" size={12} sw={2} />{le.setupNote}</span>
+										{/if}
+									</div>
 								</div>
-								{#if le.setupNote}
-									<span class="setup-note"><Icon name="cog" size={12} sw={2} />{le.setupNote}</span>
-								{/if}
-							</div>
-							<button class="icon-btn" style="flex:0 0 auto" onclick={() => removeExercise(exIndex)} aria-label="Remove exercise">
-								<Icon name="trash" size={17} color="var(--ink-3)" />
-							</button>
-						</div>
+							{/snippet}
+							{#snippet actions()}
+								<button class="swipe-btn" style="background:var(--accent)" onclick={() => swapExercise(exIndex)}>
+									<Icon name="swap" size={18} color="#fff" sw={2.2} />
+									<span>Swap</span>
+								</button>
+								<button class="swipe-btn" style="background:var(--warn)" onclick={() => removeExercise(exIndex)}>
+									<Icon name="trash" size={18} color="#fff" sw={2.2} />
+									<span>Delete</span>
+								</button>
+							{/snippet}
+						</SwipeActions>
 
 						<table class="settable">
 							<thead>

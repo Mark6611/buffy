@@ -65,6 +65,50 @@ test('a quick-log workout can be saved as a new template', async ({ page }) => {
 	await expect(page.getByRole('button', { name: /My New Split/ })).toBeVisible();
 });
 
+async function swipeOpen(page: import('@playwright/test').Page, rowLocator: import('@playwright/test').Locator) {
+	const box = await rowLocator.boundingBox();
+	if (!box) throw new Error('swipe row not found');
+	const startX = box.x + box.width - 20;
+	const y = box.y + box.height / 2;
+	await page.mouse.move(startX, y);
+	await page.mouse.down();
+	await page.mouse.move(startX - 80, y, { steps: 5 });
+	await page.mouse.move(startX - 160, y, { steps: 5 });
+	await page.mouse.up();
+}
+
+test('swiping an exercise row reveals delete/swap; delete removes it', async ({ page }) => {
+	await page.getByRole('button', { name: /Shoulder Core/ }).first().click();
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await expect(page).toHaveURL(/\/workout/);
+
+	const firstBlock = page.locator('.ex-block').first();
+	await swipeOpen(page, firstBlock.locator('.swipe-content'));
+	await expect(firstBlock.getByRole('button', { name: 'Swap' })).toBeVisible();
+	await expect(firstBlock.getByRole('button', { name: 'Delete' })).toBeVisible();
+
+	page.once('dialog', (d) => d.accept());
+	await firstBlock.getByRole('button', { name: 'Delete' }).click();
+	await expect(page.getByText('Dumbbell Shoulder Press')).toHaveCount(0);
+	await expect(page.locator('.ex-name').first()).toHaveText('Cable Lateral Raise');
+});
+
+test('swiping and tapping Swap replaces the exercise', async ({ page }) => {
+	await page.getByRole('button', { name: /Shoulder Core/ }).first().click();
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await expect(page).toHaveURL(/\/workout/);
+
+	const firstBlock = page.locator('.ex-block').first();
+	await swipeOpen(page, firstBlock.locator('.swipe-content'));
+	await firstBlock.getByRole('button', { name: 'Swap' }).click();
+	await expect(page).toHaveURL(/\/picker\?to=workout&swap=0/);
+	await expect(page.getByText('Swap Exercise')).toBeVisible();
+
+	await page.getByRole('button', { name: /Dumbbell Bicep Curl/ }).click();
+	await expect(page).toHaveURL(/\/workout/);
+	await expect(page.locator('.ex-name').first()).toHaveText('Dumbbell Bicep Curl');
+});
+
 test('an in-progress workout resumes after a reload', async ({ page }) => {
 	await page.getByRole('button', { name: /Legs/ }).first().click();
 	await page.getByRole('button', { name: 'Start', exact: true }).click();
