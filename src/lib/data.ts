@@ -1,7 +1,7 @@
 // Backup / restore service — export & import all Buffy data via the repository.
 import { getRepository } from '$lib/db';
 import { setVolume } from '$lib/compute';
-import { saveTextFile } from '$lib/native';
+import { saveTextFile, writeAutoBackup } from '$lib/native';
 import type { Exercise, Template, WorkoutSession, Settings } from '$lib/types';
 
 export interface BuffyBackup {
@@ -37,6 +37,18 @@ export async function buildBackup(): Promise<BuffyBackup> {
 		repo.getSettings()
 	]);
 	return { app: 'buffy', version: 1, exportedAt: new Date().toISOString(), exercises, templates, sessions, settings };
+}
+
+/** Automatic post-workout backup — native only (web/PWA uses manual export). */
+export async function autoBackup(): Promise<void> {
+	try {
+		const ok = await writeAutoBackup(JSON.stringify(await buildBackup()));
+		if (ok && typeof localStorage !== 'undefined') {
+			localStorage.setItem('buffy:lastAutoBackup', new Date().toISOString());
+		}
+	} catch {
+		/* best-effort */
+	}
 }
 
 export async function exportJSON() {

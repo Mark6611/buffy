@@ -4,6 +4,7 @@
 	import { workout } from '$lib/stores/workout.svelte';
 	import { mmss, kg, parseMmss } from '$lib/format';
 	import { platesPerSide, formatPerSide } from '$lib/plates';
+	import { autoBackup } from '$lib/data';
 	import type { LoggedSet } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
@@ -20,6 +21,7 @@
 
 	async function finish() {
 		const id = await workout.finish();
+		if (id) void autoBackup(); // native: snapshot all data to Documents after a logged workout
 		goto(id ? `/history/${id}` : '/');
 	}
 	function close() {

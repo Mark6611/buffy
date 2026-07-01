@@ -202,3 +202,25 @@ export async function endRestLiveActivity(): Promise<void> {
 		/* best-effort */
 	}
 }
+
+// ───────────────────────────────────────────────── automatic backup
+/**
+ * Write an automatic backup to the app's Documents (native only). Documents is
+ * included in the device's iCloud backup and — with UIFileSharingEnabled — is
+ * visible in the Files app, so data survives device loss/restore. No entitlement.
+ */
+export async function writeAutoBackup(content: string): Promise<boolean> {
+	if (!isNative) return false;
+	try {
+		const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+		await Filesystem.writeFile({
+			path: 'buffy-auto-backup.json',
+			data: content,
+			directory: Directory.Documents,
+			encoding: Encoding.UTF8
+		});
+		return true;
+	} catch {
+		return false;
+	}
+}

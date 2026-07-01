@@ -8,6 +8,7 @@
 
 	let counts = $state({ sessions: 0, templates: 0 });
 	let lastBackup = $state<string | null>(null);
+	let lastAuto = $state<string | null>(null);
 	let message = $state('');
 	let busy = $state(false);
 
@@ -22,6 +23,7 @@
 		const [s, t] = await Promise.all([repo.listSessions(), repo.listTemplates()]);
 		counts = { sessions: s.length, templates: t.length };
 		lastBackup = localStorage.getItem('buffy:lastBackup');
+		lastAuto = localStorage.getItem('buffy:lastAutoBackup');
 	}
 
 	async function doExportJSON() {
@@ -98,6 +100,11 @@
 						Last backup
 						<span class="mono">{lastBackup ? relativeDay(lastBackup) : 'never'}</span>
 					</div>
+					{#if lastAuto}
+						<div class="txt-sm" style="color:var(--ink-3)">
+							Auto-backup <span class="mono">{relativeDay(lastAuto)}</span> · saved to Files
+						</div>
+					{/if}
 				</div>
 			</div>
 
