@@ -16,6 +16,14 @@ let seeding: Promise<void> | null = null;
 
 /** Idempotent first-run seed. Safe to await on every page load. */
 export function ensureSeeded(): Promise<void> {
-	if (!seeding) seeding = seedDatabase(getRepository());
+	if (!seeding) {
+		seeding = seedDatabase(getRepository()).catch((err) => {
+			// Don't cache the failure — a corrupt/blocked open should be retryable on
+			// the next navigation rather than wedging the app forever.
+			seeding = null;
+			console.error('[buffy] database init/seed failed', err);
+			throw err;
+		});
+	}
 	return seeding;
 }

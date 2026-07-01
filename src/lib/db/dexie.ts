@@ -16,12 +16,22 @@ class BuffyDB extends Dexie {
 
 	constructor() {
 		super('buffy');
+		// Schema versioning — to evolve the schema, ADD a new version() block below;
+		// never edit an existing one in place (that silently drops user data). Add
+		// .upgrade((tx) => …) when reshaping records; index-only changes migrate
+		// automatically and preserve all data.
 		this.version(1).stores({
 			exercises: 'id, name, equipment, trackingType',
 			templates: 'id, name, updatedAt',
 			sessions: 'id, startedAt, sourceTemplateId',
 			settings: 'id'
 		});
+		// v2: index completed sessions by endedAt (history + per-exercise lookups).
+		this.version(2).stores({
+			sessions: 'id, startedAt, sourceTemplateId, endedAt'
+		});
+		// If another tab upgrades the schema, close this connection rather than block it.
+		this.on('versionchange', () => this.close());
 	}
 }
 

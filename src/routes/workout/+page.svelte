@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { mmss, kg, parseMmss } from '$lib/format';
+	import { platesPerSide, formatPerSide } from '$lib/plates';
 	import type { LoggedSet } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
@@ -115,6 +116,14 @@
 							</tbody>
 						</table>
 
+						{#if ex?.equipment === 'barbell' && exIndex === workout.activeEx && (le.sets[workout.activeSet]?.weight ?? 0) > 0}
+							<div class="txt-sm" style="display:flex;align-items:center;gap:8px;padding:9px 2px 0;color:var(--ink-2)">
+								<span style="font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--ink-3);border:1px solid var(--line);border-radius:5px;padding:1px 5px">BAR</span>
+								<span class="mono">{formatPerSide(platesPerSide(le.sets[workout.activeSet]?.weight ?? 0))}</span>
+								<span style="color:var(--ink-3)">/ side</span>
+							</div>
+						{/if}
+
 						{#if sg}
 							<div style="display:flex;align-items:center;gap:8px;padding:10px 2px 2px;flex-wrap:wrap">
 								<Icon name="spark" size={14} color="var(--accent)" />
@@ -133,6 +142,16 @@
 				<button class="btn btn-ghost btn-block" style="margin-top:6px" onclick={() => goto('/picker?to=workout')}>
 					<Icon name="plus" size={18} />Add exercise
 				</button>
+
+				<div style="margin-top:20px">
+					<div class="h-sec" style="margin-bottom:8px">Session notes</div>
+					<textarea
+						class="note-input"
+						placeholder="How did it go? Form cues, how you felt, anything to remember…"
+						value={workout.session.note ?? ''}
+						oninput={(e) => workout.setNote(e.currentTarget.value)}
+					></textarea>
+				</div>
 			</div>
 		</div>
 	</div>

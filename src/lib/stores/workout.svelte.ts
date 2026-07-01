@@ -383,6 +383,10 @@ class WorkoutStore {
 		const row = this.plannedRest[exIndex];
 		if (row && setIndex < row.length) row[setIndex] = Math.max(0, Math.round(sec || 0));
 	}
+	/** Free-text note for the whole session. */
+	setNote(text: string) {
+		if (this.session) this.session.note = text;
+	}
 	togglePause() {
 		if (this.restRunning) {
 			// bank the running segment, then freeze

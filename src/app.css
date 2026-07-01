@@ -223,6 +223,15 @@ button.setcheck { cursor: pointer; padding: 0; }
 .row-done input.inp:focus { background: var(--surface); border-color: var(--accent); color: var(--ink); }
 input.inp.rest-inp { width: 66px; padding: 0 6px; }
 
+/* free-text notes (session notes on the workout screen) */
+.note-input {
+  width: 100%; min-height: 60px; resize: vertical; padding: 11px 12px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  font-family: var(--font-ui); font-size: 14px; color: var(--ink); line-height: 1.45;
+}
+.note-input:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-tint); }
+.note-input::placeholder { color: var(--ink-3); }
+
 .lasttime { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); }
 .suggest {
   display: inline-flex; align-items: center; gap: 5px;
