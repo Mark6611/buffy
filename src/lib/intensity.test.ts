@@ -18,13 +18,25 @@ describe('computeWorkoutIntensity', () => {
 		expect(r.band).toBe('moderate');
 	});
 
-	it('bands scale with effort', () => {
+	it('bands scale with effort (strength-calibrated thresholds 35/55/75)', () => {
 		const easy = computeWorkoutIntensity({ samples: bpms([90]), restingHr: 60, maxHr: 180 })!;
 		expect(easy.band).toBe('easy'); // HRR 0.25
-		const hard = computeWorkoutIntensity({ samples: bpms([155]), restingHr: 60, maxHr: 180 })!;
-		expect(hard.band).toBe('hard'); // HRR ~0.79
-		const maximal = computeWorkoutIntensity({ samples: bpms([175]), restingHr: 60, maxHr: 180 })!;
-		expect(maximal.band).toBe('maximal'); // HRR ~0.96
+		const hard = computeWorkoutIntensity({ samples: bpms([135]), restingHr: 60, maxHr: 180 })!;
+		expect(hard.band).toBe('hard'); // HRR ~0.63 — a working strength session
+		const maximal = computeWorkoutIntensity({ samples: bpms([155]), restingHr: 60, maxHr: 180 })!;
+		expect(maximal.band).toBe('maximal'); // HRR ~0.79 — sustained near-cardio effort
+	});
+
+	it('a realistic lifting session (rests included in the average) is not graded easy', () => {
+		// 6 work sets ~148bpm with 2.5-min rests ~112bpm, resting 55, max 187 (age 30)
+		const session = [
+			...Array(10).fill(105), // warmup
+			...Array(12).fill(148), ...Array(30).fill(112), // work/rest blocks
+			...Array(12).fill(150), ...Array(30).fill(114),
+			...Array(12).fill(146), ...Array(30).fill(110)
+		];
+		const r = computeWorkoutIntensity({ samples: bpms(session), restingHr: 55, age: 30 })!;
+		expect(r.band).not.toBe('easy');
 	});
 
 	it('derives max HR from age when not given (Tanaka)', () => {

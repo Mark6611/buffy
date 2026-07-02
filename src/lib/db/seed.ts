@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	increments: { barbell: 2.5, dumbbellPerSide: 1, machinePin: 5 },
 	hapticAtRestEnd: true,
 	writeToHealth: false, // opt-in — first toggle triggers the iOS permission prompt
+	readRecoveryFromHealth: false, // opt-in — readiness + intensity from Health data
 	cloudSyncEnabled: false // opt-in — checks iCloud availability before turning on
 };
 

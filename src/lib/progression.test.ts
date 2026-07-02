@@ -97,7 +97,7 @@ describe('computeSuggestion', () => {
 			{ readiness: 'strained' }
 		);
 		expect(sg?.hit).toBe(true);
-		expect(sg?.stepLabel).toBe('hold · recovery');
+		expect(sg?.stepLabel).toBe('hold (recovery)');
 		expect(sg?.heldForRecovery).toBe(true);
 	});
 	it('cardio → null (log-only)', () => {
@@ -117,7 +117,7 @@ describe('computeSuggestion', () => {
 			})!;
 			expect(sg.hit).toBe(true);
 			expect(sg.nextWeight).toBe(40); // held, not 42.5
-			expect(sg.stepLabel).toBe('hold · recovery');
+			expect(sg.stepLabel).toBe('hold (recovery)');
 			expect(sg.heldForRecovery).toBe(true);
 		});
 
@@ -154,7 +154,7 @@ describe('computeSuggestion', () => {
 				{ readiness: 'strained' }
 			)!;
 			expect(sg.nextReps).toBe(10);
-			expect(sg.stepLabel).toBe('hold · recovery');
+			expect(sg.stepLabel).toBe('hold (recovery)');
 		});
 	});
 });

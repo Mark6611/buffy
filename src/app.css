@@ -134,6 +134,7 @@ body {
 }
 .chip.solid { background: var(--ink); color: #fff; border-color: var(--ink); }
 .chip.accent { background: var(--accent-tint); color: var(--accent-ink); border-color: transparent; }
+.chip.warn { background: var(--warn-tint); color: var(--warn); border-color: transparent; }
 .chip-eq { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.3px; }
 
 .btn {

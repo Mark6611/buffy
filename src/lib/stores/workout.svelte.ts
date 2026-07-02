@@ -6,6 +6,7 @@ import { getRepository } from '$lib/db';
 import type { Exercise, LoggedExercise, LoggedSet, WorkoutSession } from '$lib/types';
 import { settings } from './settings.svelte';
 import { computeSuggestion, type Suggestion } from '$lib/progression';
+import { recovery } from './recovery.svelte';
 import {
 	haptic,
 	keepAwake,
@@ -188,9 +189,10 @@ class WorkoutStore {
 		// auto-progression suggestions from last time
 		const sugg: Record<string, Suggestion | null> = {};
 		if (settings.current.autoProgression) {
+			await recovery.refresh(); // suggestions must see today's band, not last view's
 			for (const ex of meta) {
 				const last = await repo.lastSessionForExercise(ex.id);
-				sugg[ex.id] = computeSuggestion(ex, last);
+				sugg[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
 			}
 		}
 
@@ -292,11 +294,12 @@ class WorkoutStore {
 		this.meta = s.exercises.map((le) => byId.get(le.exerciseId) as Exercise);
 		const sugg: Record<string, Suggestion | null> = {};
 		if (settings.current.autoProgression) {
+			await recovery.refresh(); // suggestions must see today's band, not last view's
 			for (const le of s.exercises) {
 				const ex = byId.get(le.exerciseId);
 				if (!ex) continue;
 				const last = await repo.lastSessionForExercise(ex.id);
-				sugg[ex.id] = computeSuggestion(ex, last);
+				sugg[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
 			}
 		}
 		this.suggestions = sugg;
@@ -395,7 +398,7 @@ class WorkoutStore {
 	private async hydrateSuggestionFor(ex: Exercise) {
 		if (!settings.current.autoProgression) return;
 		const last = await getRepository().lastSessionForExercise(ex.id);
-		this.suggestions[ex.id] = computeSuggestion(ex, last);
+		this.suggestions[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
 	}
 
 	addSet(exIndex: number) {

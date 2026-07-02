@@ -200,6 +200,40 @@ The full review of the sync path found real design flaws — all fixed before sy
 - Overlapping sync passes are serialized, and a pulled record only lands if it's still newer
   than what's on the device *at write time* (an edit made mid-sync can't be clobbered).
 
+## Build 8 additions — Whoop / recovery integration
+
+Everything below reads the data your Whoop strap (or watch) writes into Apple Health.
+It's all opt-in behind **Settings → Apple Health → "Read recovery from Health"** — turning
+it on shows the iOS read-permission sheet (allow HRV, resting HR, heart rate, sleep).
+One heads-up: iOS deliberately hides whether *read* access was granted, so if you deny,
+things quietly show no data rather than erroring — the Settings row tells you where to
+re-enable (Health → Sharing → Apps → Buffy).
+
+### Daily readiness badge
+Home screen, next to the date: **fresh / moderate / strained · score**. A Buffy-native
+read of HRV-vs-baseline, resting-HR-vs-baseline, and last night's sleep — the same raw
+signals Whoop uses (its branded Recovery % never enters HealthKit). Tap it to open
+Settings, which shows the same number plus a max-HR field. Whoop must be set to sync
+with Apple Health (Whoop app → Settings → Apple Health) for the signals to exist.
+
+### Recovery-aware auto-progression
+On a **strained** day, hitting your rep target no longer bumps the weight — the suggest
+chip shows **"hold (recovery)"** instead of "+2.5". Fresh/moderate days behave exactly
+as before, and turning the Health toggle off restores fully recovery-agnostic behavior.
+
+### Workout intensity from heart rate
+Finish a workout and Buffy pulls the HR samples covering that exact time window and
+grades the session: **easy / moderate / hard / maximal · score** (avg % of heart-rate
+reserve, calibrated for lifting sessions where rests drag the average down), with avg/peak
+bpm and a time-in-zone bar on the workout's History page. Whoop typically syncs to Health
+minutes-to-hours after a workout, so the card often appears the *next time you open that
+workout* rather than immediately — that's expected (lazy backfill).
+
+*Verified: 117 unit tests (readiness scoring, intensity math incl. a realistic rest-dominated
+lifting session, recovery-gated progression), svelte-check clean, 6/6 E2E, iOS archive
+compiles. Needs your device: the real Health permission sheet, real Whoop data flowing, and
+the badge/card rendering with your actual numbers.*
+
 ## Open questions for you
 - iCloud toggle in build 6: does it now show "unavailable" instead of crashing? (It should.)
 - Anything off in the Live Activity styling (color, layout, what it shows, button placement)?

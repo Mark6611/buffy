@@ -29,7 +29,7 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Buffy can save finished workouts to Health so they show up alongside your other activity.</string>
+	<string>Buffy reads your heart rate, HRV, resting heart rate and sleep from Health (written there by your watch or Whoop) to show daily readiness and workout intensity.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Buffy can save finished workouts to Health so they show up alongside your other activity.</string>
 	<key>NSSupportsLiveActivities</key>

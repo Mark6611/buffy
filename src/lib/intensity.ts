@@ -33,10 +33,14 @@ export interface WorkoutIntensity {
 	zones: { z1: number; z2: number; z3: number; z4: number; z5: number };
 }
 
+// Calibrated for REST-DOMINATED sessions (lifting): the session average
+// includes every between-set rest, so cardio-style cutoffs (easy <50) would
+// grade nearly all strength work "easy". A hard hypertrophy session with
+// normal rests averages ~45-60 %HRR; sustained cardio still lands maximal.
 function bandFor(score: number): IntensityBand {
-	if (score < 50) return 'easy';
-	if (score < 70) return 'moderate';
-	if (score < 85) return 'hard';
+	if (score < 35) return 'easy';
+	if (score < 55) return 'moderate';
+	if (score < 75) return 'hard';
 	return 'maximal';
 }
 

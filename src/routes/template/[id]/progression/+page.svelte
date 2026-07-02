@@ -6,6 +6,7 @@
 	import { settings } from '$lib/stores/settings.svelte';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { computeSuggestion, type Suggestion } from '$lib/progression';
+	import { recovery } from '$lib/stores/recovery.svelte';
 	import { kg } from '$lib/format';
 	import type { Template, Exercise } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
@@ -27,7 +28,7 @@
 			const ex = byId.get(te.exerciseId);
 			if (!ex) continue;
 			const last = await repo.lastSessionForExercise(ex.id);
-			out.push({ ex, sg: computeSuggestion(ex, last) });
+			out.push({ ex, sg: computeSuggestion(ex, last, { readiness: recovery.current?.band }) });
 		}
 		rows = out;
 	});

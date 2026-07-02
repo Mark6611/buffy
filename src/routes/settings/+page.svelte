@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { mmss, parseMmss } from '$lib/format';
-	import { isNative, requestHealthAuthorization, cloudSyncIsAvailable } from '$lib/native';
+	import { isNative, requestHealthAuthorization, requestHealthReadAuthorization, cloudSyncIsAvailable } from '$lib/native';
+	import { recovery } from '$lib/stores/recovery.svelte';
 	import { runCloudSync, LAST_CLOUD_SYNC_KEY } from '$lib/cloudSync';
 	import { exportJSON } from '$lib/data';
 	import { relativeDay } from '$lib/format';
@@ -34,6 +35,23 @@
 			if (!granted) return; // permission denied — leave the toggle off
 		}
 		settings.save({ writeToHealth: next });
+	}
+
+	function saveMaxHr(v: string) {
+		const n = parseFloat(v);
+		// blank (or nonsense) clears the override back to the estimate
+		settings.save({ maxHr: Number.isFinite(n) && n > 0 ? n : undefined });
+	}
+
+	async function toggleRecovery() {
+		const next = !s.readRecoveryFromHealth;
+		if (next) {
+			// iOS hides read-grant status — a completed sheet is the best signal we get.
+			const ok = await requestHealthReadAuthorization();
+			if (!ok) return;
+		}
+		await settings.save({ readRecoveryFromHealth: next });
+		void recovery.refresh(true);
 	}
 
 	async function toggleCloudSync() {
@@ -155,6 +173,30 @@
 							<div><div style="font-weight:500">Write workouts to Health</div><div class="txt-sm">saves duration to Apple Health on finish</div></div>
 							<button class="toggle {s.writeToHealth ? 'on' : ''}" aria-label="toggle" onclick={toggleHealth}><i></i></button>
 						</div>
+						<div class="divider"></div>
+						<div class="row" style="justify-content:space-between">
+							<div>
+								<div style="font-weight:500">Read recovery from Health</div>
+								<div class="txt-sm">readiness &amp; workout intensity from HRV, resting HR, sleep and heart rate (e.g. from Whoop) — on strained days, auto-progression holds the bump</div>
+							</div>
+							<button class="toggle {s.readRecoveryFromHealth ? 'on' : ''}" aria-label="toggle" onclick={toggleRecovery}><i></i></button>
+						</div>
+						{#if s.readRecoveryFromHealth}
+							<div class="divider"></div>
+							<div class="row" style="justify-content:space-between">
+								<div style="font-weight:500">Today's readiness</div>
+								{#if recovery.current}
+									<span class="chip {recovery.current.band === 'fresh' ? 'accent' : recovery.current.band === 'strained' ? 'warn' : ''}" style="font-size:12px;text-transform:capitalize">{recovery.current.band} · {recovery.current.score}</span>
+								{:else}
+									<span class="txt-sm">no data yet — check Health → Sharing → Apps → Buffy, or wait for your wearable to sync</span>
+								{/if}
+							</div>
+							<div class="divider"></div>
+							<div class="row" style="justify-content:space-between">
+								<div><div style="font-weight:500">Max heart rate</div><div class="txt-sm">for intensity zones — blank uses an estimate</div></div>
+								<input class="inp" type="number" step="1" style="width:64px" placeholder="190" value={s.maxHr ?? ''} onchange={(e) => saveMaxHr(e.currentTarget.value)} />
+							</div>
+						{/if}
 					</div>
 				</div>
 

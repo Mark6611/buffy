@@ -122,6 +122,18 @@ export interface WorkoutSession {
 	title?: string;
 	exercises: LoggedExercise[];
 	note?: string;
+	/** Measured heart-rate summary for this session (from Apple Health, e.g. a Whoop
+	 *  strap) — stored, not derived: Buffy's own records can't reproduce it. Absent
+	 *  when HR reading is off or no samples covered the workout window. */
+	intensity?: {
+		/** avg % heart-rate reserve, 0–100 */
+		score: number;
+		band: 'easy' | 'moderate' | 'hard' | 'maximal';
+		avgHr: number;
+		peakHr: number;
+		/** fraction of time per %HRR zone */
+		zones: { z1: number; z2: number; z3: number; z4: number; z5: number };
+	};
 	/** ISO — stamped by the repository on every write; powers iCloud sync merge */
 	updatedAt?: string;
 	/** ISO tombstone — see Exercise.deletedAt */
@@ -140,6 +152,11 @@ export interface Settings {
 	increments: ProgressionIncrements;
 	hapticAtRestEnd: boolean;
 	writeToHealth: boolean;
+	/** read HRV / resting HR / sleep / workout heart rate from Apple Health (e.g.
+	 *  written there by Whoop) to power readiness + workout intensity */
+	readRecoveryFromHealth: boolean;
+	/** max heart rate for intensity zones — unset falls back to an estimate */
+	maxHr?: number;
 	cloudSyncEnabled: boolean;
 	// weight unit is always kg (fixed) — no field needed
 }

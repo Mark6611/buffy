@@ -264,8 +264,21 @@ interface HealthBridge {
 	isAvailable(): Promise<{ available: boolean }>;
 	requestAuthorization(): Promise<{ granted: boolean }>;
 	writeWorkout(opts: { startTime: number; endTime: number }): Promise<void>;
+	requestReadAuthorization(): Promise<{ granted: boolean }>;
+	readRecoverySignals(): Promise<RecoverySignals>;
+	readHeartRateSamples(opts: { startTime: number; endTime: number }): Promise<{ samplesJson: string }>;
 }
 const Health = registerPlugin<HealthBridge>('Health');
+
+/** The recovery signals a wearable wrote into Health — every key optional;
+ *  shape matches $lib/readiness's ReadinessInput on purpose. */
+export interface RecoverySignals {
+	hrvMs?: number;
+	hrvBaselineMs?: number;
+	restingHr?: number;
+	restingHrBaseline?: number;
+	sleepHours?: number;
+}
 
 /** Prompt the standard iOS Health permission sheet (native only). */
 export async function requestHealthAuthorization(): Promise<boolean> {
@@ -287,6 +300,45 @@ export async function writeHealthWorkout(startMs: number, endMs: number): Promis
 		await Health.writeWorkout({ startTime: startMs, endTime: endMs });
 	} catch {
 		/* best-effort — permission may have been denied */
+	}
+}
+
+/** Prompt the Health READ permission sheet (HRV / resting HR / heart rate / sleep).
+ *  iOS hides read-grant status by design: true only means the flow completed —
+ *  denied types just return no data later. */
+export async function requestHealthReadAuthorization(): Promise<boolean> {
+	if (!isNative) return false;
+	try {
+		const { available } = await Health.isAvailable();
+		if (!available) return false;
+		const { granted } = await Health.requestReadAuthorization();
+		return granted;
+	} catch {
+		return false;
+	}
+}
+
+/** Today's recovery signals vs their baselines. {} when nothing is available. */
+export async function readRecoverySignals(): Promise<RecoverySignals> {
+	if (!isNative) return {};
+	try {
+		return await Health.readRecoverySignals();
+	} catch {
+		return {};
+	}
+}
+
+/** Heart-rate samples inside a workout window (native only, [] elsewhere/on error). */
+export async function readWorkoutHeartRate(
+	startMs: number,
+	endMs: number
+): Promise<{ bpm: number; atMs: number }[]> {
+	if (!isNative) return [];
+	try {
+		const { samplesJson } = await Health.readHeartRateSamples({ startTime: startMs, endTime: endMs });
+		return JSON.parse(samplesJson);
+	} catch {
+		return [];
 	}
 }
 

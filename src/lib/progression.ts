@@ -54,7 +54,7 @@ export function computeSuggestion(
 		const advance = hit && !strained;
 		return {
 			last: `${m}:${String(r).padStart(2, '0')} hold`,
-			stepLabel: advance ? '+5s' : held ? 'hold · recovery' : 'hold',
+			stepLabel: advance ? '+5s' : held ? 'hold (recovery)' : 'hold',
 			hit,
 			heldForRecovery: held
 		};
@@ -71,7 +71,7 @@ export function computeSuggestion(
 		return {
 			last: `${lastSet.reps ?? 0} reps`,
 			nextReps: advance ? targetReps + 1 : targetReps,
-			stepLabel: advance ? '+1 rep' : held ? 'hold · recovery' : 'hold',
+			stepLabel: advance ? '+1 rep' : held ? 'hold (recovery)' : 'hold',
 			hit,
 			heldForRecovery: held
 		};
@@ -82,7 +82,7 @@ export function computeSuggestion(
 	return {
 		last: `${lastSet.reps ?? 0}×${kg(lastSet.weight)}kg${ex.loadType === 'per_side' ? ' ×2' : ''}`,
 		nextWeight: advance ? topWeight + step : topWeight,
-		stepLabel: advance ? `+${kg(step)}` : held ? 'hold · recovery' : 'hold',
+		stepLabel: advance ? `+${kg(step)}` : held ? 'hold (recovery)' : 'hold',
 		hit,
 		heldForRecovery: held
 	};

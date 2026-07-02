@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { getRepository } from '$lib/db';
+	import { captureSessionIntensity } from '$lib/sessionIntensity';
 	import { sessionVolume, sessionSetCount, sessionDurationSec } from '$lib/compute';
 	import { relativeDay, hhmm, mmss, kg, volK } from '$lib/format';
 	import type { WorkoutSession, Exercise, LoggedExercise } from '$lib/types';
@@ -20,6 +21,14 @@
 		const [sess, ex] = await Promise.all([repo.getSession(id), repo.listExercises()]);
 		s = sess ?? null;
 		byId = new Map(ex.map((e) => [e.id, e]));
+		// Lazy intensity backfill: the wearable's HR usually reaches Health well
+		// after the workout ended, so viewing a session is the natural retry point.
+		if (sess && !sess.intensity) {
+			const updated = await captureSessionIntensity($state.snapshot(sess));
+			// patch the one field — swapping the whole object would discard a note
+			// the user typed into the textarea while the backfill was in flight
+			if (updated && s) s.intensity = updated.intensity;
+		}
 	});
 
 	async function saveNote() {
@@ -88,6 +97,27 @@
 					<span style="width:1px;background:var(--line)"></span>
 					<Kpi v={mmss(sessionDurationSec(s) ?? 0)} l="duration" mono />
 				</div>
+
+				{#if s.intensity}
+					{@const wi = s.intensity}
+					<div class="card card-pad" style="margin-bottom:16px">
+						<div class="row" style="justify-content:space-between;margin-bottom:10px">
+							<div style="font-weight:500;text-transform:capitalize">Intensity — {wi.band} · {wi.score}</div>
+							<span class="txt-sm mono">avg {wi.avgHr} · peak {wi.peakHr} bpm</span>
+						</div>
+						<!-- time-in-zone bar: z1→z5 left to right, deeper tint = harder -->
+						<div style="display:flex;gap:1px;height:8px;border-radius:var(--r-pill);overflow:hidden;background:var(--surface-2)">
+							{#each [wi.zones.z1, wi.zones.z2, wi.zones.z3, wi.zones.z4, wi.zones.z5] as frac, zi (zi)}
+								{#if frac > 0}
+									<span style="width:{frac * 100}%;background:color-mix(in oklch, var(--accent) {15 + zi * 21}%, var(--surface-2))"></span>
+								{/if}
+							{/each}
+						</div>
+						<div class="txt-sm" style="margin-top:6px">
+							heart rate via Apple Health — % of workout per effort zone
+						</div>
+					</div>
+				{/if}
 
 				<div class="h-sec" style="margin-bottom:10px">Logged exercises</div>
 				<div style="display:flex;flex-direction:column;gap:10px">

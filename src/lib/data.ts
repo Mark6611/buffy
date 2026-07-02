@@ -56,6 +56,8 @@ export async function exportJSON() {
 	await saveTextFile(`buffy-backup-${stamp()}.json`, JSON.stringify(data, null, 2), 'application/json');
 }
 
+// Per-SET rows; session-level measured intensity (WorkoutSession.intensity) is
+// deliberately omitted — it doesn't repeat per set. The JSON backup carries it.
 export async function exportCSV() {
 	const repo = getRepository();
 	const [sessions, exAll] = await Promise.all([repo.listSessions(), repo.listExercises()]);

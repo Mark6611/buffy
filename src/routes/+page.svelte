@@ -6,6 +6,7 @@
 	import { durationLabel, volK } from '$lib/format';
 	import { kpis } from '$lib/analytics';
 	import { syncWidget } from '$lib/widgetSync';
+	import { recovery } from '$lib/stores/recovery.svelte';
 	import type { Template, Exercise, WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
@@ -40,7 +41,20 @@
 	<div class="screen-body">
 		<div style="display:flex;align-items:flex-end;justify-content:space-between;padding:8px 20px 14px">
 			<div>
-				<div class="txt-sm" style="margin-bottom:2px">{dateLabel}</div>
+				<div class="txt-sm" style="margin-bottom:2px;display:flex;align-items:center;gap:8px">
+					{dateLabel}
+					{#if recovery.current}
+						{@const band = recovery.current.band}
+						<button
+							class="chip {band === 'fresh' ? 'accent' : band === 'strained' ? 'warn' : ''}"
+							style="font-size:11px;text-transform:capitalize;border:none"
+							onclick={() => goto('/settings')}
+							aria-label="Readiness {band} {recovery.current.score} — from Apple Health; tap for details"
+						>
+							{band} · {recovery.current.score}
+						</button>
+					{/if}
+				</div>
 				<div class="h-app" style="font-size:28px">Workouts</div>
 			</div>
 			<div style="display:flex;gap:8px">

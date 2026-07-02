@@ -22,6 +22,7 @@
 	} from '$lib/native';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { settings } from '$lib/stores/settings.svelte';
+	import { recovery } from '$lib/stores/recovery.svelte';
 	import { runCloudSync } from '$lib/cloudSync';
 
 	// Svelte 5 runes: `children` is the page being rendered inside the layout.
@@ -54,8 +55,12 @@
 		if (workout.active) goto('/workout');
 
 		void maybeCloudSync();
+		void recovery.refresh();
 		const onVisible = () => {
-			if (document.visibilityState === 'visible') void maybeCloudSync();
+			if (document.visibilityState === 'visible') {
+				void maybeCloudSync();
+				void recovery.refresh();
+			}
 		};
 		document.addEventListener('visibilitychange', onVisible);
 		return () => document.removeEventListener('visibilitychange', onVisible);

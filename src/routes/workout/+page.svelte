@@ -5,6 +5,7 @@
 	import { mmss, kg, parseMmss } from '$lib/format';
 	import { platesPerSide, formatPerSide } from '$lib/plates';
 	import { autoBackup } from '$lib/data';
+	import { captureSessionIntensity } from '$lib/sessionIntensity';
 	import { syncWidget } from '$lib/widgetSync';
 	import { getRepository } from '$lib/db';
 	import { settings } from '$lib/stores/settings.svelte';
@@ -51,6 +52,9 @@
 
 			const repo = getRepository();
 			const saved = await repo.getSession(id);
+			// Best-effort HR-intensity capture; often a no-op right at finish because
+			// the wearable hasn't synced to Health yet — history view backfills later.
+			if (saved) void captureSessionIntensity(saved);
 			if (!saved) {
 				triggerCloudSync();
 				goto(`/history/${id}`);
