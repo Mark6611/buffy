@@ -49,7 +49,7 @@
 							class="chip {band === 'fresh' ? 'accent' : band === 'strained' ? 'warn' : ''}"
 							style="font-size:11px;text-transform:capitalize;border:none"
 							onclick={() => goto('/settings')}
-							aria-label="Readiness {band} {recovery.current.score} — from Apple Health; tap for details"
+							aria-label="Readiness {band} {recovery.current.score} — via {recovery.source === 'whoop' ? 'Whoop' : 'Apple Health'}; tap for details"
 						>
 							{band} · {recovery.current.score}
 						</button>

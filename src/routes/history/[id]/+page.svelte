@@ -23,11 +23,14 @@
 		byId = new Map(ex.map((e) => [e.id, e]));
 		// Lazy intensity backfill: the wearable's HR usually reaches Health well
 		// after the workout ended, so viewing a session is the natural retry point.
-		if (sess && !sess.intensity) {
+		if (sess && (!sess.intensity || !sess.whoop)) {
 			const updated = await captureSessionIntensity($state.snapshot(sess));
-			// patch the one field — swapping the whole object would discard a note
-			// the user typed into the textarea while the backfill was in flight
-			if (updated && s) s.intensity = updated.intensity;
+			// patch the measured fields only — swapping the whole object would discard
+			// a note the user typed into the textarea while the backfill was in flight
+			if (updated && s) {
+				s.intensity = updated.intensity;
+				s.whoop = updated.whoop;
+			}
 		}
 	});
 
@@ -98,9 +101,16 @@
 					<Kpi v={mmss(sessionDurationSec(s) ?? 0)} l="duration" mono />
 				</div>
 
-				{#if s.intensity}
+				{#if s.intensity || s.whoop}
 					{@const wi = s.intensity}
 					<div class="card card-pad" style="margin-bottom:16px">
+						{#if s.whoop}
+							<div class="row" style="justify-content:space-between;margin-bottom:{wi ? '8px' : '0'}">
+								<div style="font-weight:500">Whoop strain {s.whoop.strain.toFixed(1)}</div>
+								<span class="txt-sm mono">avg {s.whoop.avgHr} · max {s.whoop.maxHr} bpm</span>
+							</div>
+						{/if}
+						{#if wi}
 						<div class="row" style="justify-content:space-between;margin-bottom:10px">
 							<div style="font-weight:500;text-transform:capitalize">Intensity — {wi.band} · {wi.score}</div>
 							<span class="txt-sm mono">avg {wi.avgHr} · peak {wi.peakHr} bpm</span>
@@ -116,6 +126,7 @@
 						<div class="txt-sm" style="margin-top:6px">
 							heart rate via Apple Health — % of workout per effort zone
 						</div>
+						{/if}
 					</div>
 				{/if}
 

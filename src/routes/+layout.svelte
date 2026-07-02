@@ -18,11 +18,13 @@
 		setupNativeChrome,
 		hideSplash,
 		requestNotificationPermission,
+		onAppUrlOpen,
 		isNative
 	} from '$lib/native';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { recovery } from '$lib/stores/recovery.svelte';
+	import { whoop } from '$lib/stores/whoop.svelte';
 	import { runCloudSync } from '$lib/cloudSync';
 
 	// Svelte 5 runes: `children` is the page being rendered inside the layout.
@@ -56,6 +58,15 @@
 
 		void maybeCloudSync();
 		void recovery.refresh();
+		// Whoop OAuth lands back here via the buffy:// scheme (relayed by the
+		// Vercel callback page) — on success the badge switches source immediately.
+		onAppUrlOpen((url) => {
+			if (url.startsWith('buffy://whoop-callback')) {
+				void whoop.handleCallback(url).then((ok) => {
+					if (ok) void recovery.refresh(true);
+				});
+			}
+		});
 		const onVisible = () => {
 			if (document.visibilityState === 'visible') {
 				void maybeCloudSync();

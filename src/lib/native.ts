@@ -400,3 +400,42 @@ export async function cloudSyncPush(type: string, records: CloudRecord[]): Promi
 	if (!isNative || records.length === 0) return;
 	await CloudSync.push({ type, recordsJson: JSON.stringify(records) });
 }
+
+// ─────────────────────────────────────────────────────── OAuth / external HTTP
+/** Fires `handler` whenever the app is opened via its buffy:// URL scheme
+ *  (registered in Info.plist) — e.g. the Whoop OAuth callback relay. */
+export function onAppUrlOpen(handler: (url: string) => void): void {
+	if (!isNative) return;
+	void import('@capacitor/app').then(({ App }) => {
+		void App.addListener('appUrlOpen', ({ url }) => handler(url));
+	});
+}
+
+/** Open an auth page in the in-app browser sheet (SFSafariViewController). */
+export async function openAuthBrowser(url: string): Promise<void> {
+	if (!isNative) return;
+	const { Browser } = await import('@capacitor/browser');
+	await Browser.open({ url });
+}
+
+/** Dismiss the in-app browser (call after the deep-link callback lands). */
+export async function closeAuthBrowser(): Promise<void> {
+	if (!isNative) return;
+	try {
+		const { Browser } = await import('@capacitor/browser');
+		await Browser.close();
+	} catch {
+		/* already closed */
+	}
+}
+
+/** GET a cross-origin API via the native HTTP layer — the WebView's fetch is
+ *  CORS-bound and third-party APIs (Whoop) don't serve CORS headers. */
+export async function nativeHttpGet(
+	url: string,
+	headers: Record<string, string>
+): Promise<{ status: number; data: unknown }> {
+	const { CapacitorHttp } = await import('@capacitor/core');
+	const r = await CapacitorHttp.get({ url, headers });
+	return { status: r.status, data: r.data };
+}

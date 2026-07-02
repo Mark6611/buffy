@@ -134,6 +134,9 @@ export interface WorkoutSession {
 		/** fraction of time per %HRR zone */
 		zones: { z1: number; z2: number; z3: number; z4: number; z5: number };
 	};
+	/** Matched Whoop workout (official API) — measured externally, so stored.
+	 *  strain is Whoop's 0–21 scale. */
+	whoop?: { strain: number; avgHr: number; maxHr: number };
 	/** ISO — stamped by the repository on every write; powers iCloud sync merge */
 	updatedAt?: string;
 	/** ISO tombstone — see Exercise.deletedAt */

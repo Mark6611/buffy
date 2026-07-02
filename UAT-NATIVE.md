@@ -234,6 +234,46 @@ lifting session, recovery-gated progression), svelte-check clean, 6/6 E2E, iOS a
 compiles. Needs your device: the real Health permission sheet, real Whoop data flowing, and
 the badge/card rendering with your actual numbers.*
 
+## Build 9 additions — real Whoop integration (official API)
+
+Build 8's readiness/intensity derives numbers from raw Health signals. Build 9 adds the
+real thing: **your actual Whoop Recovery % and Strain**, via Whoop's official API. When
+connected, the home badge shows Whoop's own Recovery (same green/yellow/red bands), and
+finished workouts get the matching Whoop workout's **Strain (0–21)** + avg/max HR on their
+History card — alongside, not replacing, the Health-derived intensity.
+
+### One-time setup you must do (≈5 minutes, free)
+Buffy can't do this part — it's your Whoop account:
+1. Go to **developer.whoop.com** → sign in with your Whoop credentials → it will ask you to
+   create a **Team** (any name, e.g. "Buffy") — teams are mandatory even for individuals.
+2. **Create an App** with:
+   - **Redirect URI** (must be EXACTLY this): `https://buffy-six.vercel.app/whoop/callback`
+   - **Scopes**: tick `read:recovery`, `read:cycles`, `read:sleep`, `read:workout`,
+     `read:profile`, and `offline`
+   - Name/logo don't matter (personal apps under 10 users never need Whoop's approval).
+3. You'll get a **Client ID** and **Client Secret** immediately. Add both to Vercel:
+   vercel.com → the buffy project → **Settings → Environment Variables** →
+   `WHOOP_CLIENT_ID` and `WHOOP_CLIENT_SECRET` (Production) → **redeploy** (Deployments →
+   ⋯ on the latest → Redeploy).
+4. In Buffy: **Settings → Whoop → Connect** → Whoop's login/consent page opens in-app →
+   approve → you bounce back to Buffy with a "Connected" chip. No app update needed —
+   the app picks the credentials up from the server at runtime.
+
+### What to verify once connected
+- **Settings → Whoop** shows "Today — recovery NN · strain N.N" (recovery appears after
+  you've woken up + synced; it's "pending" before Whoop scores your sleep).
+- The **home badge** now shows Whoop's Recovery number (it beats the Health-derived score
+  whenever both exist).
+- Finish a workout that Whoop also tracked → its History page gains a **"Whoop strain"**
+  line. Like the intensity card, it may appear on the next view rather than instantly —
+  Whoop scores workouts server-side after your strap syncs.
+- Auto-progression now holds bumps on a **red (strained) Whoop day**, same as build 8's
+  Health-derived version.
+
+*Verified: 121 unit tests (incl. session↔Whoop workout time-matching), svelte-check clean,
+6/6 E2E, iOS archive compiles. Needs you: the developer-app creation above, then the live
+OAuth round-trip and real data — none of which can be exercised without your Whoop account.*
+
 ## Open questions for you
 - iCloud toggle in build 6: does it now show "unavailable" instead of crashing? (It should.)
 - Anything off in the Live Activity styling (color, layout, what it shows, button placement)?

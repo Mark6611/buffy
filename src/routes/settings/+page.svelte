@@ -4,6 +4,7 @@
 	import { mmss, parseMmss } from '$lib/format';
 	import { isNative, requestHealthAuthorization, requestHealthReadAuthorization, cloudSyncIsAvailable } from '$lib/native';
 	import { recovery } from '$lib/stores/recovery.svelte';
+	import { whoop } from '$lib/stores/whoop.svelte';
 	import { runCloudSync, LAST_CLOUD_SYNC_KEY } from '$lib/cloudSync';
 	import { exportJSON } from '$lib/data';
 	import { relativeDay } from '$lib/format';
@@ -186,7 +187,10 @@
 							<div class="row" style="justify-content:space-between">
 								<div style="font-weight:500">Today's readiness</div>
 								{#if recovery.current}
-									<span class="chip {recovery.current.band === 'fresh' ? 'accent' : recovery.current.band === 'strained' ? 'warn' : ''}" style="font-size:12px;text-transform:capitalize">{recovery.current.band} · {recovery.current.score}</span>
+									<span style="display:inline-flex;align-items:center;gap:6px">
+										<span class="txt-sm">via {recovery.source === 'whoop' ? 'Whoop' : 'Health'}</span>
+										<span class="chip {recovery.current.band === 'fresh' ? 'accent' : recovery.current.band === 'strained' ? 'warn' : ''}" style="font-size:12px;text-transform:capitalize">{recovery.current.band} · {recovery.current.score}</span>
+									</span>
 								{:else}
 									<span class="txt-sm">no data yet — check Health → Sharing → Apps → Buffy, or wait for your wearable to sync</span>
 								{/if}
@@ -198,6 +202,55 @@
 							</div>
 						{/if}
 					</div>
+				</div>
+
+				<div>
+					<div class="h-sec" style="margin-bottom:8px">Whoop</div>
+					<div class="card">
+						<div class="row" style="justify-content:space-between">
+							<div>
+								<div style="font-weight:500">Connect Whoop</div>
+								<div class="txt-sm">your real Recovery % and workout Strain, straight from Whoop</div>
+							</div>
+							{#if whoop.connected}
+								<span class="chip accent" style="font-size:12px">Connected</span>
+							{:else}
+								<button class="btn btn-ghost btn-sm" style="height:36px" onclick={() => whoop.connect()} disabled={whoop.connecting}>
+									{whoop.connecting ? 'Connecting…' : 'Connect'}
+								</button>
+							{/if}
+						</div>
+						{#if whoop.connected}
+							{#if whoop.today && (whoop.today.recoveryScore != null || whoop.today.dayStrain != null)}
+								<div class="divider"></div>
+								<div class="row" style="justify-content:space-between">
+									<div style="font-weight:500">Today</div>
+									<span class="txt-sm mono">
+										{whoop.today.recoveryScore != null ? `recovery ${whoop.today.recoveryScore}` : 'recovery pending'}{whoop.today.dayStrain != null ? ` · strain ${whoop.today.dayStrain.toFixed(1)}` : ''}
+									</span>
+								</div>
+							{/if}
+							<div class="divider"></div>
+							<button
+								class="row"
+								style="justify-content:space-between;width:100%;background:transparent;border:none;text-align:left"
+								onclick={async () => {
+									await whoop.disconnect();
+									void recovery.refresh(true);
+								}}
+							>
+								<div style="font-weight:500;color:var(--warn)">Disconnect</div>
+							</button>
+						{/if}
+					</div>
+					{#if whoop.unconfigured}
+						<div class="txt-sm" style="margin-top:8px;padding-inline:4px;color:var(--ink-2)">
+							Whoop isn't set up on the server yet — create an app at developer.whoop.com and set
+							WHOOP_CLIENT_ID / WHOOP_CLIENT_SECRET in Vercel (steps in UAT-NATIVE.md).
+						</div>
+					{:else if whoop.lastError}
+						<div class="txt-sm" style="margin-top:8px;padding-inline:4px;color:var(--warn)">{whoop.lastError}</div>
+					{/if}
 				</div>
 
 				<div>
