@@ -4,7 +4,7 @@ Everything below is built, type-checked (0 errors), tested (52 unit + 2 E2E), an
 on every push. Install the latest build via the **TestFlight** app (the App Store Connect
 listing is named **"BuffUp"**; the app on your home screen is **"Buffy"**).
 
-> **Build:** `1.0 (4)` · bundle `com.mark.buffy` · Team `ZCS5Y23P62`
+> **Build:** `1.0 (6)` · bundle `com.mark.buffy` · Team `ZCS5Y23P62`
 > Build 1 = pipeline validation (no native extras). Build 2 = timer/notification/splash/haptic
 > features + editable timers. Build 3 = superset round-cycling, notes, plate calculator,
 > native auto-backup. **Build 4 = home-screen widget, Apple Health, interactive Live Activity.**
@@ -148,29 +148,44 @@ Same native-picker pattern as elsewhere in the app (tap → iOS wheel picker), p
 the muscle groups the app's own Trends analytics already recognize — nothing you pick here
 can go unseen by the body-map / muscle-balance charts.
 
-### iCloud Sync ⚠️ needs your on-device test before you trust it
-**Settings → iCloud Sync → "Sync with iCloud"** — off by default. Mirrors your exercises,
-templates, and sessions to CloudKit's private database (your iCloud account, no separate
-login, nothing I can see). Last-write-wins per record if you use Buffy on two devices.
+### iCloud Sync — crash fixed in build 6; sync itself lights up in build 7
+**Settings → iCloud Sync → "Sync with iCloud"** — off by default. When it works, it mirrors
+your exercises, templates, and sessions to CloudKit's private database (your iCloud account,
+no separate login, nothing I can see), last-write-wins per record across devices.
 
-**Please read this before testing:** while building this, I found and fixed a real crash —
-the first version crashed the *entire app on every single launch*, not just when using sync,
-because it touched CloudKit eagerly at startup. That's fixed (confirmed: the app now launches
-and runs normally). But tapping the toggle itself **still crashes in the iOS Simulator**,
-because CloudKit hard-requires a properly signed, provisioned build to even construct its
-container — the simulator's unsigned dev build can't satisfy that, no matter how the Swift
-code is written. TestFlight builds *are* properly signed and provisioned, so my expectation
-is this works correctly there — but I have not been able to confirm that myself.
-- **Test it cautiously:** tap the toggle once. If it works, great — you'll see "Last synced"
-  and a "Sync now" button appear.
-- **If it crashes:** your data is safe regardless — the crash happens *before* the toggle's
-  setting is ever saved, so it won't loop on relaunch, and nothing about your workout history
-  is touched by this at all. Just tell me and send me what you see (or I can pull the crash
-  log from your device) and I'll dig in with real data instead of guessing.
+**What happened, honestly:** tapping the toggle crashed the app (SIGABRT). Root cause, verified
+against Apple's servers: the App ID `com.mark.buffy` was **never provisioned** for CloudKit
+(nor App Groups, nor HealthKit) — only In-App Purchase was enabled. Automatic code-signing
+therefore strips those entitlements out of every build, and CloudKit's `CKContainer.default()`
+raises an uncaught Objective-C exception the moment it's touched with no iCloud entitlement.
+
+- **Build 6 (this build): the crash is gone.** `CKContainer.default()` is now wrapped in an
+  Objective-C `@try/@catch` shim, so tapping the toggle safely reports "iCloud isn't available"
+  instead of crashing. Please confirm on-device: tapping the toggle should NOT crash — it should
+  just show an unavailable message. Your workout data is untouched throughout.
+- **Sync doesn't actually run yet.** It can't until the App ID is provisioned for CloudKit and
+  a CloudKit container exists. That's the one-time setup below.
+
+### ⚠️ Correction: the widget, interactive Live Activity, and Apple Health weren't really working
+Same root cause. Because App Groups and HealthKit were never enabled on the App ID, on your
+device: the **home-screen widget** has been stuck on its placeholder (no real data), the
+**Live Activity +30s / Skip** buttons didn't hand back to the app, and **Apple Health** writes
+silently did nothing (the toggle wouldn't turn on). None of these crash — they just no-op. The
+*code* for all of them is correct; they were gated behind capabilities that were switched off.
+I enabled HealthKit + App Groups on the App ID via the API; they finish provisioning in build 7.
+
+### One-time setup that unlocks build 7 (widget + Health + iCloud sync)
+Open `ios/App/App.xcodeproj` in Xcode, then:
+1. **App** target → **Signing & Capabilities**. You'll already see **HealthKit** and **App Groups**.
+   - Under **App Groups**, click **+** and add `group.com.mark.buffy`.
+   - Click **+ Capability** → **iCloud** → tick **CloudKit** → under Containers click **+** →
+     add `iCloud.com.mark.buffy`.
+2. **RestWidget** target → **Signing & Capabilities** → **App Groups** → tick `group.com.mark.buffy`.
+3. Tell me — I'll rebuild via a *signed* archive (which actually embeds these entitlements),
+   verify each one landed, deploy the CloudKit schema to Production, and ship build 7.
 
 ## Open questions for you
-- iCloud Sync: did it crash on your device, or work? This is the one piece I couldn't fully
-  verify myself this session.
+- iCloud toggle in build 6: does it now show "unavailable" instead of crashing? (It should.)
 - Anything off in the Live Activity styling (color, layout, what it shows, button placement)?
   Easy to tweak — it currently shows the exercise name + countdown + "REST" + the two buttons.
 - Widget looks right? It's a small/medium card with streak, volume, sessions, and a next/last
