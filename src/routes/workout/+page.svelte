@@ -14,6 +14,7 @@
 	import { applyFullSync, applyWeightsOnlySync, buildTemplateFromSession } from '$lib/templateSync';
 	import type { LoggedSet, Template, WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
+	import { haptic } from '$lib/native';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import RestBanner from '$lib/components/RestBanner.svelte';
 	import SwipeActions from '$lib/components/SwipeActions.svelte';
@@ -170,6 +171,68 @@
 			if (i !== exIndex) r?.close();
 		});
 	}
+
+	// Swipe-left-to-delete on SET rows. Rows are real <tr>s inside the sets
+	// table, so the div-based SwipeActions can't wrap them — instead this is the
+	// iOS full-swipe pattern: drag past the threshold and release to delete (the
+	// row tints warn once armed). One finger ⇒ one shared drag state. Drags never
+	// start on inputs/buttons, and vertical intent hands the gesture to scrolling.
+	const SET_DELETE_AT = -80;
+	let setDrag = $state<{ ex: number; set: number; x: number; armed: boolean } | null>(null);
+	let setDragStart: { x: number; y: number; intent: boolean } | null = null;
+	function setRowPointerDown(ex: number, set: number, e: PointerEvent) {
+		if ((e.target as HTMLElement).closest('input, button')) return;
+		setDragStart = { x: e.clientX, y: e.clientY, intent: false };
+		setDrag = { ex, set, x: 0, armed: false };
+	}
+	function setRowPointerMove(e: PointerEvent) {
+		if (!setDrag || !setDragStart) return;
+		const dx = e.clientX - setDragStart.x;
+		const dy = e.clientY - setDragStart.y;
+		if (!setDragStart.intent) {
+			if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+				// vertical — this is a scroll, not a swipe
+				setDrag = null;
+				setDragStart = null;
+				return;
+			}
+			if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+			setDragStart.intent = true;
+			try {
+				(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+			} catch {
+				/* capture unsupported */
+			}
+		}
+		const x = Math.max(-120, Math.min(0, dx));
+		setDrag = { ...setDrag, x, armed: x < SET_DELETE_AT };
+	}
+	function setRowPointerUp(e: PointerEvent) {
+		if (!setDrag) return;
+		const el = e.currentTarget as HTMLElement;
+		if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+		if (setDragStart?.intent && setDrag.x < SET_DELETE_AT) {
+			void haptic('light');
+			workout.removeSetAt(setDrag.ex, setDrag.set);
+		}
+		setDrag = null;
+		setDragStart = null;
+	}
+	function setRowPointerCancel(e: PointerEvent) {
+		const el = e.currentTarget as HTMLElement;
+		if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+		setDrag = null;
+		setDragStart = null;
+	}
+	function setRowStyle(ex: number, set: number): string {
+		const d = setDrag && setDrag.ex === ex && setDrag.set === set ? setDrag : null;
+		const x = d?.x ?? 0;
+		return (
+			`touch-action:pan-y;transform:translateX(${x}px);` +
+			`transition:${d && setDragStart?.intent ? 'none' : 'transform 0.18s ease, background-color 0.18s ease'};` +
+			(d?.armed ? 'background-color:var(--warn-tint);' : '')
+		);
+	}
 </script>
 
 {#snippet restCell(exIndex: number, s: number, set: LoggedSet)}
@@ -248,7 +311,14 @@
 							<tbody>
 								{#each le.sets as set, s (s)}
 									{@const isActive = exIndex === workout.activeEx && s === workout.activeSet && !set.completed}
-									<tr class={set.completed ? 'row-done' : isActive ? 'row-active' : ''}>
+									<tr
+										class={set.completed ? 'row-done' : isActive ? 'row-active' : ''}
+										style={setRowStyle(exIndex, s)}
+										onpointerdown={(e) => setRowPointerDown(exIndex, s, e)}
+										onpointermove={setRowPointerMove}
+										onpointerup={setRowPointerUp}
+										onpointercancel={setRowPointerCancel}
+									>
 										<td class="c">
 											<button class="setcheck {set.completed ? 'done' : ''}" onclick={() => workout.toggleSet(exIndex, s)} aria-label="toggle set">
 												{#if set.completed}<Icon name="check" size={14} sw={2.6} color="#fff" />{/if}
@@ -274,6 +344,13 @@
 								{/each}
 							</tbody>
 						</table>
+						<button
+							class="txt-sm"
+							style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
+							onclick={() => workout.addSet(exIndex)}
+						>
+							<Icon name="plus" size={13} sw={2.2} color="var(--ink-3)" />Add set
+						</button>
 
 						{#if ex?.equipment === 'barbell' && exIndex === workout.activeEx && (le.sets[workout.activeSet]?.weight ?? 0) > 0}
 							<div class="txt-sm" style="display:flex;align-items:center;gap:8px;padding:9px 2px 0;color:var(--ink-2)">

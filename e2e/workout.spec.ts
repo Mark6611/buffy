@@ -121,3 +121,47 @@ test('an in-progress workout resumes after a reload', async ({ page }) => {
 	await expect(page).toHaveURL(/\/workout/);
 	await expect(page.locator('tr.row-done')).toHaveCount(1);
 });
+
+test('a set row can be added and swipe-deleted mid-workout', async ({ page }) => {
+	await page.getByRole('button', { name: /Shoulder Core/ }).first().click();
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await expect(page).toHaveURL(/\/workout/);
+
+	const firstBlock = page.locator('.ex-block').first();
+	const rows = firstBlock.locator('tbody tr');
+	const before = await rows.count();
+
+	// add a set
+	await firstBlock.getByRole('button', { name: 'Add set' }).click();
+	await expect(rows).toHaveCount(before + 1);
+
+	// full-swipe the new last row left → it deletes (real mouse drag, matching
+	// the pointer-gesture pattern the exercise-row swipe tests established)
+	const row = rows.last();
+	const box = (await row.boundingBox())!;
+	// start away from the inputs: the row number cell on the left
+	const startX = box.x + 40;
+	const y = box.y + box.height / 2;
+	await page.mouse.move(startX, y);
+	await page.mouse.down();
+	for (let i = 1; i <= 6; i++) await page.mouse.move(startX - i * 20, y);
+	await page.mouse.up();
+	await expect(rows).toHaveCount(before);
+
+	// the last remaining set refuses to delete
+	while ((await rows.count()) > 1) {
+		const r = rows.last();
+		const b = (await r.boundingBox())!;
+		await page.mouse.move(b.x + 40, b.y + b.height / 2);
+		await page.mouse.down();
+		for (let i = 1; i <= 6; i++) await page.mouse.move(b.x + 40 - i * 20, b.y + b.height / 2);
+		await page.mouse.up();
+	}
+	const lastRow = rows.first();
+	const lb = (await lastRow.boundingBox())!;
+	await page.mouse.move(lb.x + 40, lb.y + lb.height / 2);
+	await page.mouse.down();
+	for (let i = 1; i <= 6; i++) await page.mouse.move(lb.x + 40 - i * 20, lb.y + lb.height / 2);
+	await page.mouse.up();
+	await expect(rows).toHaveCount(1);
+});

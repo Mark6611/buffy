@@ -414,14 +414,46 @@ class WorkoutStore {
 			perSide: last?.perSide
 		});
 		this.plannedRest[exIndex]?.push(this.plannedRest[exIndex].at(-1) ?? settings.current.defaultRestSec);
+		// if everything was complete, the new set is now the workout's next target
+		this.setActiveToFirstIncomplete();
 	}
 
 	removeSet(exIndex: number) {
 		const le = this.session?.exercises[exIndex];
-		if (le && le.sets.length > 1) {
-			le.sets.pop();
-			this.plannedRest[exIndex]?.pop();
+		if (le) this.removeSetAt(exIndex, le.sets.length - 1);
+	}
+
+	/** Delete one set mid-workout (swipe-to-delete on a set row). The last
+	 *  remaining set can't be removed — deleting the whole exercise is the
+	 *  existing swipe on its header. */
+	removeSetAt(exIndex: number, setIndex: number) {
+		const le = this.session?.exercises[exIndex];
+		if (!le || le.sets.length <= 1 || !le.sets[setIndex]) return;
+		le.sets.splice(setIndex, 1);
+		le.sets.forEach((set, i) => (set.index = i));
+		this.plannedRest[exIndex]?.splice(setIndex, 1);
+
+		if (this.restForSet?.ex === exIndex) {
+			if (this.restForSet.set === setIndex) {
+				// the set we were resting after is gone — nothing to record the rest against
+				cancelRestEndAlert();
+				this.restRunning = false;
+				this.restAccumSec = 0;
+				this.restStartedAtMs = 0;
+				this.restSeedSec = 0;
+				this.restForSet = null;
+				this.restHapticFired = false;
+			} else if (this.restForSet.set > setIndex) {
+				this.restForSet = { ...this.restForSet, set: this.restForSet.set - 1 };
+			}
 		}
+		this.setActiveToFirstIncomplete();
+		// mirror removeExercise's clamp: with everything complete the active pointer
+		// can be left past the shortened set list
+		if (this.activeEx === exIndex && this.activeSet >= le.sets.length) {
+			this.activeSet = Math.max(0, le.sets.length - 1);
+		}
+		this.restLiveSync();
 	}
 
 	toggleSet(exIndex: number, setIndex: number) {

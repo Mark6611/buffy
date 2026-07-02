@@ -448,3 +448,61 @@ describe('swapExercise', () => {
 		expect(workout.session?.exercises[0].exerciseId).toBe('press');
 	});
 });
+
+describe('addSet / removeSetAt', () => {
+	it('removeSetAt drops the set and its planned rest, and reindexes the rest', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		const n = workout.session!.exercises[0].sets.length;
+		workout.removeSetAt(0, 0);
+		const sets = workout.session!.exercises[0].sets;
+		expect(sets).toHaveLength(n - 1);
+		expect(sets.map((x) => x.index)).toEqual(sets.map((_, i) => i));
+		expect(workout.plannedRest[0]).toHaveLength(n - 1);
+	});
+
+	it('clears the rest timer when the set being rested after is removed', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0); // rest now runs against set 0
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		workout.removeSetAt(0, 0);
+		expect(workout.restForSet).toBeNull();
+		expect(workout.restRunning).toBe(false);
+	});
+
+	it('shifts restForSet.set down when an earlier set is removed', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0);
+		workout.toggleSet(0, 1); // rest moves to set 1
+		expect(workout.restForSet).toEqual({ ex: 0, set: 1 });
+		workout.removeSetAt(0, 0); // remove set 0 — rested set shifts to index 0
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		expect(workout.restRunning).toBe(true);
+	});
+
+	it('never removes the last remaining set', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		const n = workout.session!.exercises[0].sets.length;
+		for (let i = 0; i < n; i++) workout.removeSetAt(0, 0);
+		expect(workout.session!.exercises[0].sets).toHaveLength(1);
+	});
+
+	it('addSet copies the last set values and becomes the next target when all were complete', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		const le = workout.session!.exercises[0];
+		le.sets.forEach((_, i) => workout.toggleSet(0, i));
+		const before = le.sets.length;
+		le.sets[before - 1].weight = 42.5;
+		workout.addSet(0);
+		expect(le.sets).toHaveLength(before + 1);
+		expect(le.sets[before].weight).toBe(42.5);
+		expect(le.sets[before].completed).toBe(false);
+		expect(workout.plannedRest[0]).toHaveLength(before + 1);
+		expect(workout.activeEx).toBe(0);
+		expect(workout.activeSet).toBe(before);
+	});
+});

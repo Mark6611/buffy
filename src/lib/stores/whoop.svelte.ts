@@ -48,9 +48,11 @@ export interface WhoopWorkout {
 	sport?: string;
 }
 
-async function prefs() {
-	const { Preferences } = await import('@capacitor/preferences');
-	return Preferences;
+// NB: never return the Preferences plugin proxy from an async function — promise
+// resolution probes `.then` on it, which the Capacitor proxy treats as a plugin
+// method call and rejects. Await the module, destructure at the call site.
+function prefs() {
+	return import('@capacitor/preferences');
 }
 
 class WhoopStore {
@@ -73,7 +75,8 @@ class WhoopStore {
 
 	private async hydrate() {
 		try {
-			const { value } = await (await prefs()).get({ key: TOKENS_KEY });
+			const { Preferences } = await prefs();
+			const { value } = await Preferences.get({ key: TOKENS_KEY });
 			this.tokens = value ? (JSON.parse(value) as Tokens) : null;
 		} catch {
 			this.tokens = null;
@@ -84,9 +87,9 @@ class WhoopStore {
 	private async save(t: Tokens | null) {
 		this.tokens = t;
 		this.connected = t !== null;
-		const p = await prefs();
-		if (t) await p.set({ key: TOKENS_KEY, value: JSON.stringify(t) });
-		else await p.remove({ key: TOKENS_KEY });
+		const { Preferences } = await prefs();
+		if (t) await Preferences.set({ key: TOKENS_KEY, value: JSON.stringify(t) });
+		else await Preferences.remove({ key: TOKENS_KEY });
 	}
 
 	/** Kick off the OAuth flow in the in-app browser sheet. */

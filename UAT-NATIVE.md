@@ -274,6 +274,16 @@ Buffy can't do this part — it's your Whoop account:
 6/6 E2E, iOS archive compiles. Needs you: the developer-app creation above, then the live
 OAuth round-trip and real data — none of which can be exercised without your Whoop account.*
 
+## Build 10 additions — set-level editing mid-workout
+- **Add a set:** every exercise now has an **"+ Add set"** row under its table — copies the
+  previous set's weight/reps and becomes the next target.
+- **Swipe a set row left to delete it** (the whole row slides and tints red past the
+  threshold — release to delete, with a haptic). The last remaining set won't delete;
+  removing the exercise itself is the existing swipe on its header row.
+This was the gap you reported: the exercise-row swipe existed, but sets had no add/delete
+at all. *Verified: 5 new store unit tests (rest-timer shifts/cancel on set removal, min-1
+guard, add-set targeting) + a real-gesture E2E test (7/7).*
+
 ## Open questions for you
 - iCloud toggle in build 6: does it now show "unavailable" instead of crashing? (It should.)
 - Anything off in the Live Activity styling (color, layout, what it shows, button placement)?
