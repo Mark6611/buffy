@@ -26,15 +26,15 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSSupportsLiveActivities</key>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Buffy can save finished workouts to Health so they show up alongside your other activity.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Buffy can save finished workouts to Health so they show up alongside your other activity.</string>
-	<key>UIFileSharingEnabled</key>
+	<key>NSSupportsLiveActivities</key>
 	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
