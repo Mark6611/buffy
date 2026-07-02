@@ -79,4 +79,54 @@ describe('computeSuggestion', () => {
 		);
 		expect(sg).toBeNull();
 	});
+
+	describe('readiness nudge', () => {
+		const hitSession = () => session('inc', [set({ reps: 8, weight: 40 }), set({ reps: 9, weight: 40 })]);
+
+		it("strained holds the load even on a hit, and flags heldForRecovery", () => {
+			const sg = computeSuggestion(exercise({ defaultTargetReps: 8, weightStep: 2.5 }), hitSession(), {
+				readiness: 'strained'
+			})!;
+			expect(sg.hit).toBe(true);
+			expect(sg.nextWeight).toBe(40); // held, not 42.5
+			expect(sg.stepLabel).toBe('hold · recovery');
+			expect(sg.heldForRecovery).toBe(true);
+		});
+
+		it('fresh/moderate progress normally (recovery-agnostic)', () => {
+			for (const readiness of ['fresh', 'moderate'] as const) {
+				const sg = computeSuggestion(exercise({ defaultTargetReps: 8, weightStep: 2.5 }), hitSession(), { readiness })!;
+				expect(sg.nextWeight).toBe(42.5);
+				expect(sg.heldForRecovery).toBe(false);
+			}
+		});
+
+		it('no opts ⇒ unchanged behavior (no heldForRecovery)', () => {
+			const sg = computeSuggestion(exercise({ defaultTargetReps: 8, weightStep: 2.5 }), hitSession())!;
+			expect(sg.nextWeight).toBe(42.5);
+			expect(sg.heldForRecovery).toBe(false);
+		});
+
+		it('strained does not rescue a miss — still a plain hold', () => {
+			const sg = computeSuggestion(
+				exercise({ defaultTargetReps: 8 }),
+				session('inc', [set({ reps: 8, weight: 40 }), set({ reps: 6, weight: 40 })]),
+				{ readiness: 'strained' }
+			)!;
+			expect(sg.hit).toBe(false);
+			expect(sg.nextWeight).toBe(40);
+			expect(sg.stepLabel).toBe('hold'); // not "hold · recovery" — the miss, not recovery, held it
+			expect(sg.heldForRecovery).toBe(false);
+		});
+
+		it('bodyweight strained holds reps', () => {
+			const sg = computeSuggestion(
+				exercise({ id: 'pu', loadType: 'bodyweight', defaultTargetReps: 10 }),
+				session('pu', [set({ reps: 10 }), set({ reps: 11 })]),
+				{ readiness: 'strained' }
+			)!;
+			expect(sg.nextReps).toBe(10);
+			expect(sg.stepLabel).toBe('hold · recovery');
+		});
+	});
 });
