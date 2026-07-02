@@ -23,18 +23,33 @@ public class CloudSyncPlugin: CAPPlugin, CAPBridgedPlugin {
 		CAPPluginMethod(name: "push", returnType: CAPPluginReturnPromise)
 	]
 
-	// Both lazy: CloudSyncPlugin is constructed at app launch (ViewController
-	// registers it before the WebView even loads), so touching CloudKit eagerly
-	// here would run on EVERY launch for EVERY user, sync enabled or not. If the
-	// iCloud container isn't provisioned yet, that's a crash on app open, not a
-	// contained sync failure. Deferring construction to first real use (a user
-	// actually toggling sync on) keeps the failure mode local to that action.
-	// .default() (== iCloud.<bundle-id>) is also the better-supported access
-	// pattern than an explicit identifier string.
-	private lazy var container = CKContainer.default()
-	private lazy var db = container.privateCloudDatabase
+	// CKContainer.default() validates the iCloud entitlement *synchronously in its
+	// initializer*, and when that entitlement is absent from the signed build it
+	// raises an Objective-C NSException (CKException) — not a Swift error, so no
+	// Swift do/catch can contain it; it aborts the process with SIGABRT. Our store
+	// build is currently signed by a profile that carries no iCloud entitlement (the
+	// App ID isn't provisioned for CloudKit yet), so constructing the container at
+	// all would crash the app the instant the user taps the sync toggle.
+	//
+	// CloudSyncSafeContainer wraps that construction in an Objective-C @try/@catch
+	// (the only language that can catch an NSException) and returns nil on failure.
+	// When nil, `container`/`db` stay nil and every method below degrades to a clean
+	// "unavailable" instead of crashing. Once the App ID is provisioned and a new
+	// profile is issued, construction succeeds and sync lights up unchanged. Kept
+	// lazy so merely registering the plugin at launch never touches CloudKit.
+	private lazy var container: CKContainer? = Self.makeContainerSafely()
+	private var db: CKDatabase? { container?.privateCloudDatabase }
+
+	private static func makeContainerSafely() -> CKContainer? {
+		CloudSyncSafeContainer.defaultContainer()
+	}
 
 	@objc func isAvailable(_ call: CAPPluginCall) {
+		guard let container else {
+			// No iCloud entitlement in this build — report unavailable, never crash.
+			call.resolve(["available": false])
+			return
+		}
 		container.accountStatus { status, _ in
 			call.resolve(["available": status == .available])
 		}
@@ -42,6 +57,10 @@ public class CloudSyncPlugin: CAPPlugin, CAPBridgedPlugin {
 
 	/// Fetch every record of `type`. Resolves { recordsJson: "[{id,updatedAt,json}]" }.
 	@objc func pull(_ call: CAPPluginCall) {
+		guard let db else {
+			call.reject("iCloud is not available in this build")
+			return
+		}
 		guard let type = call.getString("type") else {
 			call.reject("type is required")
 			return
@@ -79,6 +98,10 @@ public class CloudSyncPlugin: CAPPlugin, CAPBridgedPlugin {
 	/// Last-write-wins is already resolved on the JS side before this is called, so
 	/// this always overwrites the server copy (.allKeys) rather than diffing.
 	@objc func push(_ call: CAPPluginCall) {
+		guard let db else {
+			call.reject("iCloud is not available in this build")
+			return
+		}
 		guard let type = call.getString("type"), let recordsJson = call.getString("recordsJson") else {
 			call.reject("type and recordsJson are required")
 			return

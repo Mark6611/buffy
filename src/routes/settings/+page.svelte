@@ -42,7 +42,8 @@
 		const next = !s.cloudSyncEnabled;
 		if (next) {
 			if (!(await cloudSyncIsAvailable())) {
-				syncMessage = 'iCloud isn’t available — check you’re signed in under iOS Settings.';
+				syncMessage =
+					'iCloud isn’t available right now. Make sure you’re signed into iCloud in iOS Settings — if you are, this build may not have iCloud enabled yet.';
 				return;
 			}
 			await settings.save({ cloudSyncEnabled: true });
