@@ -31,37 +31,52 @@
 	let syncPrompt = $state<{ savedId: string; session: WorkoutSession; template: Template | null } | null>(null);
 	let newTemplateName = $state('');
 	let syncBusy = $state(false);
+	let syncError = $state('');
+	let finishing = $state(false);
 
 	async function finish() {
-		const wasTemplateSourced = workout.session?.sourceTemplateId ?? null;
-		const id = await workout.finish();
-		if (!id) {
-			goto('/');
-			return;
-		}
-		void autoBackup(); // native: snapshot all data to Documents after a logged workout
-		void refreshWidget();
-		if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
-		if (settings.current.writeToHealth) void writeHealthAfterFinish(id);
-		if (settings.current.cloudSyncEnabled) void runCloudSync();
-
-		const repo = getRepository();
-		const saved = await repo.getSession(id);
-		if (!saved) {
-			goto(`/history/${id}`);
-			return;
-		}
-		if (wasTemplateSourced) {
-			const tpl = await repo.getTemplate(wasTemplateSourced);
-			if (!tpl) {
-				goto(`/history/${id}`); // source template was deleted mid-workout — nothing to sync
+		if (finishing) return; // double-tap would double-write Health + race two syncs
+		finishing = true;
+		try {
+			const wasTemplateSourced = workout.session?.sourceTemplateId ?? null;
+			const id = await workout.finish();
+			if (!id) {
+				goto('/');
 				return;
 			}
-			syncPrompt = { savedId: id, session: saved, template: tpl };
-		} else {
-			newTemplateName = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-			syncPrompt = { savedId: id, session: saved, template: null };
+			void autoBackup(); // native: snapshot all data to Documents after a logged workout
+			void refreshWidget();
+			if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
+			if (settings.current.writeToHealth) void writeHealthAfterFinish(id);
+
+			const repo = getRepository();
+			const saved = await repo.getSession(id);
+			if (!saved) {
+				triggerCloudSync();
+				goto(`/history/${id}`);
+				return;
+			}
+			if (wasTemplateSourced) {
+				const tpl = await repo.getTemplate(wasTemplateSourced);
+				if (!tpl) {
+					triggerCloudSync();
+					goto(`/history/${id}`); // source template was deleted mid-workout — nothing to sync
+					return;
+				}
+				syncPrompt = { savedId: id, session: saved, template: tpl };
+			} else {
+				newTemplateName = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+				syncPrompt = { savedId: id, session: saved, template: null };
+			}
+		} finally {
+			finishing = false;
 		}
+	}
+	// Deferred until the template-sync choice resolves: one sync pass then carries
+	// both the session and the template decision (and an unguarded pull mid-prompt
+	// can't clobber the just-made choice).
+	function triggerCloudSync() {
+		if (settings.current.cloudSyncEnabled) void runCloudSync();
 	}
 	async function refreshWidget() {
 		const repo = getRepository();
@@ -73,35 +88,51 @@
 		if (s?.endedAt) await writeHealthWorkout(Date.parse(s.startedAt), Date.parse(s.endedAt));
 	}
 	function finalizeSync() {
-		const id = syncPrompt?.savedId;
+		if (!syncPrompt) return; // a queued double-fire (button + backdrop) must sync/navigate once
+		const id = syncPrompt.savedId;
 		syncPrompt = null;
-		goto(id ? `/history/${id}` : '/');
+		triggerCloudSync();
+		goto(`/history/${id}`);
 	}
 	async function chooseTemplateSync(mode: 'full' | 'weightsOnly' | 'none') {
 		if (syncPrompt?.template && mode !== 'none') {
 			syncBusy = true;
-			const repo = getRepository();
-			// snapshot: syncPrompt is $state, so its nested objects are reactive
-			// proxies — IndexedDB can't structured-clone those for upsertTemplate.
-			const template = $state.snapshot(syncPrompt.template);
-			const session = $state.snapshot(syncPrompt.session);
-			const updated =
-				mode === 'full'
-					? applyFullSync(template, session, new Map((await repo.listExercises()).map((e) => [e.id, e])))
-					: applyWeightsOnlySync(template, session);
-			await repo.upsertTemplate(updated);
-			syncBusy = false;
+			syncError = '';
+			try {
+				const repo = getRepository();
+				// snapshot: syncPrompt is $state, so its nested objects are reactive
+				// proxies — IndexedDB can't structured-clone those for upsertTemplate.
+				const template = $state.snapshot(syncPrompt.template);
+				const session = $state.snapshot(syncPrompt.session);
+				const updated =
+					mode === 'full'
+						? applyFullSync(template, session, new Map((await repo.listExercises()).map((e) => [e.id, e])))
+						: applyWeightsOnlySync(template, session);
+				await repo.upsertTemplate(updated);
+			} catch (e) {
+				syncError = e instanceof Error ? e.message : 'Could not update the template.';
+				return; // sheet stays up (and dismissable) for retry
+			} finally {
+				syncBusy = false;
+			}
 		}
 		finalizeSync();
 	}
 	async function saveAsNewTemplate(save: boolean) {
 		if (save && syncPrompt) {
 			syncBusy = true;
-			const repo = getRepository();
-			const exById = new Map((await repo.listExercises()).map((e) => [e.id, e]));
-			const session = $state.snapshot(syncPrompt.session);
-			await repo.upsertTemplate(buildTemplateFromSession(session, exById, newTemplateName.trim() || 'New Template'));
-			syncBusy = false;
+			syncError = '';
+			try {
+				const repo = getRepository();
+				const exById = new Map((await repo.listExercises()).map((e) => [e.id, e]));
+				const session = $state.snapshot(syncPrompt.session);
+				await repo.upsertTemplate(buildTemplateFromSession(session, exById, newTemplateName.trim() || 'New Template'));
+			} catch (e) {
+				syncError = e instanceof Error ? e.message : 'Could not save the template.';
+				return; // sheet stays up (and dismissable) for retry
+			} finally {
+				syncBusy = false;
+			}
 		}
 		finalizeSync();
 	}
@@ -155,12 +186,15 @@
 						: 'no exercises'}
 				</div>
 			</div>
-			<button class="btn btn-accent btn-sm" style="height:36px;padding:0 14px" onclick={finish}>Finish</button>
+			<button class="btn btn-accent btn-sm" style="height:36px;padding:0 14px" onclick={finish} disabled={finishing}>Finish</button>
 		</div>
 
 		<div class="screen-body">
 			<div class="pad" style="padding-bottom:40px">
-				{#each workout.session.exercises as le, exIndex (exIndex)}
+				<!-- keyed by object identity: the store splices on delete, so an index key
+				     would hand row N's SwipeActions (open/drag state) to the row shifting
+				     into slot N; swapExercise replaces the object → correctly a fresh row -->
+				{#each workout.session.exercises as le, exIndex (le)}
 					{@const ex = workout.meta[exIndex]}
 					{@const bw = ex?.loadType === 'bodyweight'}
 					{@const perSide = ex?.loadType === 'per_side'}
@@ -313,6 +347,9 @@
 					{syncBusy ? 'Working…' : 'Save as template'}
 				</button>
 			</div>
+		{/if}
+		{#if syncError}
+			<div class="txt-sm" style="margin-top:10px;padding-inline:4px;color:var(--warn)">{syncError}</div>
 		{/if}
 	</div>
 {/if}

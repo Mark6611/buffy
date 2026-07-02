@@ -69,4 +69,35 @@ describe('mergeRecords', () => {
 		expect(plan.toWriteLocally.map((r) => r.id)).toEqual(['newer-remote']);
 		expect(plan.toPushRemotely.map((r) => r.id)).toEqual(['newer-local']);
 	});
+
+	it('one corrupt remote record is skipped without poisoning the rest of the batch', () => {
+		const local = [row('mine', '2026-01-01T00:00:00Z', 'local only')];
+		const remote = [
+			{ id: 'corrupt', updatedAt: '2026-01-02T00:00:00Z', json: '{not json' },
+			cloud('good', '2026-01-02T00:00:00Z', row('good', '2026-01-02T00:00:00Z', 'fine'))
+		];
+		const plan = mergeRecords(local, remote);
+		expect(plan.toWriteLocally.map((r) => r.id)).toEqual(['good']);
+		expect(plan.toPushRemotely.map((r) => r.id)).toEqual(['mine']);
+	});
+
+	it('a local-only record without updatedAt gets stamped inside the json, matching its envelope', () => {
+		const plan = mergeRecords([row('c', undefined, 'pre-backfill')], []);
+		expect(plan.toPushRemotely).toHaveLength(1);
+		const pushed = plan.toPushRemotely[0];
+		const inner = JSON.parse(pushed.json) as Row;
+		// envelope and inner timestamp must agree, or every other device re-pulls
+		// this record forever (inner stamp never converges with the envelope)
+		expect(inner.updatedAt).toBe(pushed.updatedAt);
+		expect(Date.parse(pushed.updatedAt)).not.toBeNaN();
+	});
+
+	it('a tombstoned local record still syncs — the delete travels like any edit', () => {
+		const dead = { ...row('d', '2026-01-03T00:00:00Z', 'gone'), deletedAt: '2026-01-03T00:00:00Z' };
+		const remote = [cloud('d', '2026-01-01T00:00:00Z', row('d', '2026-01-01T00:00:00Z', 'still alive remotely'))];
+		const plan = mergeRecords([dead], remote);
+		expect(plan.toWriteLocally).toEqual([]);
+		expect(plan.toPushRemotely.map((r) => r.id)).toEqual(['d']);
+		expect(JSON.parse(plan.toPushRemotely[0].json).deletedAt).toBe('2026-01-03T00:00:00Z');
+	});
 });

@@ -105,6 +105,25 @@ describe('applyWeightsOnlySync', () => {
 		applyWeightsOnlySync(template, session());
 		expect(JSON.stringify(template)).toBe(before);
 	});
+
+	it('pairs a duplicated exercise by occurrence order, not collapsed by id', () => {
+		const dup: Template = {
+			...template,
+			exercises: [
+				{ exerciseId: 'press', groupId: null, plannedSets: [{ targetReps: 10, targetWeight: 12, targetRestSec: 90 }] },
+				{ exerciseId: 'press', groupId: null, plannedSets: [{ targetReps: 10, targetWeight: 10, targetRestSec: 90 }] }
+			]
+		};
+		const s = session({
+			exercises: [
+				{ exerciseId: 'press', groupId: null, sets: [{ index: 0, completed: true, reps: 10, weight: 14 }] },
+				{ exerciseId: 'press', groupId: null, sets: [{ index: 0, completed: true, reps: 10, weight: 11 }] }
+			]
+		});
+		const result = applyWeightsOnlySync(dup, s);
+		expect(result.exercises[0].plannedSets[0].targetWeight).toBe(14); // 1st occurrence ← 1st logged
+		expect(result.exercises[1].plannedSets[0].targetWeight).toBe(11); // 2nd occurrence ← 2nd logged
+	});
 });
 
 describe('applyFullSync', () => {

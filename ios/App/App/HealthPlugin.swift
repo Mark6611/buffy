@@ -48,13 +48,29 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 			return
 		}
 
+		// HKWorkoutBuilder — the HKWorkout(activityType:start:end:) initializer is
+		// deprecated as of iOS 17; the builder is the supported write path.
 		func save() {
-			let workout = HKWorkout(activityType: .traditionalStrengthTraining, start: start, end: end)
-			store.save(workout) { success, error in
-				if success {
-					call.resolve()
-				} else {
-					call.reject(error?.localizedDescription ?? "Failed to save workout")
+			let config = HKWorkoutConfiguration()
+			config.activityType = .traditionalStrengthTraining
+			let builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: .local())
+			builder.beginCollection(withStart: start) { began, error in
+				guard began else {
+					call.reject(error?.localizedDescription ?? "Failed to begin workout collection")
+					return
+				}
+				builder.endCollection(withEnd: end) { ended, error in
+					guard ended else {
+						call.reject(error?.localizedDescription ?? "Failed to end workout collection")
+						return
+					}
+					builder.finishWorkout { workout, error in
+						if workout != nil {
+							call.resolve()
+						} else {
+							call.reject(error?.localizedDescription ?? "Failed to save workout")
+						}
+					}
 				}
 			}
 		}

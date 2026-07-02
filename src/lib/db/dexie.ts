@@ -54,12 +54,29 @@ class BuffyDB extends Dexie {
 export class DexieRepository implements Repository {
 	readonly db = new BuffyDB();
 
-	// --- exercises ---
-	listExercises() {
-		return this.db.exercises.orderBy('name').toArray();
+	// Deletes tombstone instead of removing the row (see the interface doc) — the
+	// tombstone rides the normal updatedAt/last-write-wins sync path, so deletions
+	// propagate across devices instead of resurrecting on the next pull.
+	private async tombstone<T extends { id: ID; updatedAt?: string; deletedAt?: string }>(
+		table: Table<T, ID>,
+		id: ID
+	) {
+		const rec = await table.get(id);
+		if (!rec || rec.deletedAt) return;
+		const now = new Date().toISOString();
+		await table.put({ ...rec, deletedAt: now, updatedAt: now });
 	}
-	getExercise(id: ID) {
-		return this.db.exercises.get(id);
+	private live<T extends { deletedAt?: string }>(rows: T[]) {
+		return rows.filter((r) => !r.deletedAt);
+	}
+
+	// --- exercises ---
+	async listExercises() {
+		return this.live(await this.db.exercises.orderBy('name').toArray());
+	}
+	async getExercise(id: ID) {
+		const ex = await this.db.exercises.get(id);
+		return ex?.deletedAt ? undefined : ex;
 	}
 	async upsertExercise(ex: Exercise) {
 		// stamp centrally — sync merge depends on every write bumping this, and
@@ -67,39 +84,41 @@ export class DexieRepository implements Repository {
 		await this.db.exercises.put({ ...ex, updatedAt: new Date().toISOString() });
 	}
 	async deleteExercise(id: ID) {
-		await this.db.exercises.delete(id);
+		await this.tombstone(this.db.exercises, id);
 	}
 
 	// --- templates ---
-	listTemplates() {
-		return this.db.templates.orderBy('updatedAt').reverse().toArray();
+	async listTemplates() {
+		return this.live(await this.db.templates.orderBy('updatedAt').reverse().toArray());
 	}
-	getTemplate(id: ID) {
-		return this.db.templates.get(id);
+	async getTemplate(id: ID) {
+		const t = await this.db.templates.get(id);
+		return t?.deletedAt ? undefined : t;
 	}
 	async upsertTemplate(t: Template) {
 		await this.db.templates.put({ ...t, updatedAt: new Date().toISOString() });
 	}
 	async deleteTemplate(id: ID) {
-		await this.db.templates.delete(id);
+		await this.tombstone(this.db.templates, id);
 	}
 
 	// --- sessions ---
-	listSessions() {
-		return this.db.sessions.orderBy('startedAt').reverse().toArray();
+	async listSessions() {
+		return this.live(await this.db.sessions.orderBy('startedAt').reverse().toArray());
 	}
-	getSession(id: ID) {
-		return this.db.sessions.get(id);
+	async getSession(id: ID) {
+		const s = await this.db.sessions.get(id);
+		return s?.deletedAt ? undefined : s;
 	}
 	async upsertSession(s: WorkoutSession) {
 		await this.db.sessions.put({ ...s, updatedAt: new Date().toISOString() });
 	}
 	async deleteSession(id: ID) {
-		await this.db.sessions.delete(id);
+		await this.tombstone(this.db.sessions, id);
 	}
 	async lastSessionForExercise(exerciseId: ID) {
 		const all = await this.db.sessions.orderBy('startedAt').reverse().toArray();
-		return all.find((s) => !!s.endedAt && s.exercises.some((e) => e.exerciseId === exerciseId));
+		return all.find((s) => !s.deletedAt && !!s.endedAt && s.exercises.some((e) => e.exerciseId === exerciseId));
 	}
 
 	// --- settings ---
@@ -118,14 +137,36 @@ export class DexieRepository implements Repository {
 		await Promise.all([this.db.exercises.clear(), this.db.templates.clear(), this.db.sessions.clear()]);
 	}
 
-	// --- iCloud sync only — see the interface doc for why these skip the timestamp stamp ---
+	// --- iCloud sync only — see the interface doc for why these skip the timestamp
+	// stamp, why they must see tombstones, and why the apply re-checks freshness ---
+	listExercisesForSync() {
+		return this.db.exercises.toArray();
+	}
+	listTemplatesForSync() {
+		return this.db.templates.toArray();
+	}
+	listSessionsForSync() {
+		return this.db.sessions.toArray();
+	}
+
+	// Write the pulled record only if it is strictly newer than what's stored NOW —
+	// inside one transaction, so a local edit landing mid-sync can't be clobbered by
+	// a remote record that only beat the sync pass's pre-network snapshot.
+	private async applyIfNewer<T extends { id: ID; updatedAt?: string }>(table: Table<T, ID>, rec: T) {
+		await this.db.transaction('rw', table, async () => {
+			const cur = await table.get(rec.id);
+			const curTime = cur?.updatedAt ? Date.parse(cur.updatedAt) : -Infinity;
+			const recTime = rec.updatedAt ? Date.parse(rec.updatedAt) : -Infinity;
+			if (!cur || recTime > curTime) await table.put(rec);
+		});
+	}
 	async applySyncedExercise(ex: Exercise) {
-		await this.db.exercises.put(ex);
+		await this.applyIfNewer(this.db.exercises, ex);
 	}
 	async applySyncedTemplate(t: Template) {
-		await this.db.templates.put(t);
+		await this.applyIfNewer(this.db.templates, t);
 	}
 	async applySyncedSession(s: WorkoutSession) {
-		await this.db.sessions.put(s);
+		await this.applyIfNewer(this.db.sessions, s);
 	}
 }

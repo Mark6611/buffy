@@ -22,18 +22,36 @@
 		dragging = true;
 		startX = e.clientX;
 		startDragX = dragX;
+		// capture: without it, a mouse drag released outside the row never gets its
+		// pointerup here, leaving `dragging` stuck true (transition disabled)
+		try {
+			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		} catch {
+			/* capture unsupported — in-row drags still settle via pointerup */
+		}
 	}
 	function onPointerMove(e: PointerEvent) {
 		if (!dragging) return;
 		const delta = e.clientX - startX;
 		dragX = Math.min(0, Math.max(-actionsWidth, startDragX + delta));
 	}
-	function onPointerUp() {
-		if (!dragging) return;
+	function endDrag(e: PointerEvent) {
 		dragging = false;
+		const el = e.currentTarget as HTMLElement;
+		if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+	}
+	function onPointerUp(e: PointerEvent) {
+		if (!dragging) return;
+		endDrag(e);
 		const shouldOpen = dragX < -actionsWidth / 2;
 		dragX = shouldOpen ? -actionsWidth : 0;
 		if (shouldOpen) onOpen?.();
+	}
+	function onPointerCancel(e: PointerEvent) {
+		if (!dragging) return;
+		// the browser took the gesture (e.g. pan-y scroll) — never settle open here
+		endDrag(e);
+		dragX = 0;
 	}
 </script>
 
@@ -53,7 +71,7 @@
 		onpointerdown={onPointerDown}
 		onpointermove={onPointerMove}
 		onpointerup={onPointerUp}
-		onpointercancel={onPointerUp}
+		onpointercancel={onPointerCancel}
 	>
 		{@render children()}
 	</div>

@@ -1,22 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getRepository } from '$lib/db';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { mmss, parseMmss } from '$lib/format';
 	import { isNative, requestHealthAuthorization, cloudSyncIsAvailable } from '$lib/native';
-	import { runCloudSync } from '$lib/cloudSync';
+	import { runCloudSync, LAST_CLOUD_SYNC_KEY } from '$lib/cloudSync';
+	import { exportJSON } from '$lib/data';
 	import { relativeDay } from '$lib/format';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-
-	const LAST_SYNC_KEY = 'buffy:lastCloudSync';
 	let syncing = $state(false);
 	let syncMessage = $state('');
 	let lastSync = $state<string | null>(null);
 
 	onMount(() => {
 		settings.load();
-		lastSync = localStorage.getItem(LAST_SYNC_KEY);
+		lastSync = localStorage.getItem(LAST_CLOUD_SYNC_KEY);
 	});
 
 	const s = $derived(settings.current);
@@ -60,9 +58,7 @@
 		const result = await runCloudSync();
 		syncing = false;
 		if (result.ok) {
-			const now = new Date().toISOString();
-			localStorage.setItem(LAST_SYNC_KEY, now);
-			lastSync = now;
+			lastSync = localStorage.getItem(LAST_CLOUD_SYNC_KEY);
 			syncMessage =
 				result.pulled || result.pushed ? `Synced — ${result.pulled} pulled, ${result.pushed} pushed.` : 'Already up to date.';
 		} else {
@@ -70,23 +66,18 @@
 		}
 	}
 
+	// One export pipeline for the whole app ($lib/data): native-safe (an
+	// <a download> click is a silent no-op inside a WebView) and produces the
+	// envelope the importer on the Backup screen actually accepts.
+	let exporting = $state(false);
 	async function exportData() {
-		const repo = getRepository();
-		const [exercises, templates, sessions, settingsData] = await Promise.all([
-			repo.listExercises(),
-			repo.listTemplates(),
-			repo.listSessions(),
-			repo.getSettings()
-		]);
-		const blob = new Blob([JSON.stringify({ exercises, templates, sessions, settings: settingsData }, null, 2)], {
-			type: 'application/json'
-		});
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `buffy-export-${new Date().toISOString().slice(0, 10)}.json`;
-		a.click();
-		URL.revokeObjectURL(url);
+		if (exporting) return;
+		exporting = true;
+		try {
+			await exportJSON();
+		} finally {
+			exporting = false;
+		}
 	}
 </script>
 

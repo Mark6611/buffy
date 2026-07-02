@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
-
-@class CKContainer;
+#import <CloudKit/CloudKit.h>
 
 NS_ASSUME_NONNULL_BEGIN
 

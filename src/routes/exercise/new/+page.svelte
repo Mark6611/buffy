@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { getRepository } from '$lib/db';
+	import { newId } from '$lib/id';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { editor } from '$lib/stores/editor.svelte';
 	import { EQUIP_ICON } from '$lib/icons';
@@ -42,36 +43,43 @@
 		{ v: 'cardio', t: 'Cardio', s: 'logs time, incline, speed · log-only' }
 	];
 
+	let busy = $state(false);
+
 	async function add() {
-		if (!name.trim()) return;
-		const loadType: LoadType = perSide
-			? 'per_side'
-			: equipment === 'bodyweight' && trackingType === 'weight_reps'
-				? 'bodyweight'
-				: 'total';
-		const step = equipment === 'barbell' ? 2.5 : equipment === 'machine' ? 5 : 1;
-		const ex: Exercise = {
-			id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${crypto.randomUUID().slice(0, 4)}`,
-			name: name.trim(),
-			equipment,
-			primaryMuscles: muscle.trim() ? [muscle.trim()] : [],
-			secondaryMuscles: [],
-			trackingType,
-			loadType,
-			unilateral: perSide,
-			defaultTargetReps: trackingType === 'weight_reps' ? 10 : undefined,
-			weightStep: step,
-			defaultRestSec: restSec
-		};
-		await getRepository().upsertExercise(ex);
-		if (to === 'tpl' && editor.draft) {
-			editor.addExercise(ex);
-			goto(`/template/${editor.draft.id}/edit`);
-		} else if (workout.active) {
-			workout.addExercise(ex);
-			goto('/workout');
-		} else {
-			goto('/'); // saved to the catalog; no active editor/workout to return to
+		if (!name.trim() || busy) return; // double-tap would create two catalog entries
+		busy = true;
+		try {
+			const loadType: LoadType = perSide
+				? 'per_side'
+				: equipment === 'bodyweight' && trackingType === 'weight_reps'
+					? 'bodyweight'
+					: 'total';
+			const step = equipment === 'barbell' ? 2.5 : equipment === 'machine' ? 5 : 1;
+			const ex: Exercise = {
+				id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${newId().slice(0, 4)}`,
+				name: name.trim(),
+				equipment,
+				primaryMuscles: muscle.trim() ? [muscle.trim()] : [],
+				secondaryMuscles: [],
+				trackingType,
+				loadType,
+				unilateral: perSide,
+				defaultTargetReps: trackingType === 'weight_reps' ? 10 : undefined,
+				weightStep: step,
+				defaultRestSec: restSec
+			};
+			await getRepository().upsertExercise(ex);
+			if (to === 'tpl' && editor.draft) {
+				editor.addExercise(ex);
+				goto(`/template/${editor.draft.id}/edit`);
+			} else if (workout.active) {
+				workout.addExercise(ex);
+				goto('/workout');
+			} else {
+				goto('/'); // saved to the catalog; no active editor/workout to return to
+			}
+		} finally {
+			busy = false;
 		}
 	}
 </script>
@@ -80,7 +88,7 @@
 	<div class="topbar">
 		<button class="icon-btn" onclick={() => history.back()} aria-label="Back"><Icon name="back" size={20} /></button>
 		<div class="topbar-title">Custom Exercise</div>
-		<button class="btn btn-accent btn-sm" style="height:36px;padding:0 16px" onclick={add}>Add</button>
+		<button class="btn btn-accent btn-sm" style="height:36px;padding:0 16px" onclick={add} disabled={busy}>Add</button>
 	</div>
 	<div class="screen-body">
 		<div class="pad" style="padding-bottom:28px">

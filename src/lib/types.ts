@@ -34,6 +34,8 @@ export interface Exercise {
 	loadType: LoadType; // meaningful for weight_reps; ignored for time_hold/cardio
 	unilateral?: boolean;
 	defaultTargetReps?: number;
+	/** time_hold exercises: target hold duration — gates progression like defaultTargetReps */
+	defaultTargetDurationSec?: number;
 	/** per-exercise progression increment in kg (e.g. barbell 2.5, dumbbell-per-side 1, machine pin 5) */
 	weightStep?: number;
 	defaultRestSec?: number;
@@ -41,6 +43,9 @@ export interface Exercise {
 	setupNote?: string;
 	/** ISO — stamped by the repository on every write; powers iCloud sync merge */
 	updatedAt?: string;
+	/** ISO tombstone — set instead of hard-deleting so deletes propagate through
+	 *  sync (last-write-wins) instead of resurrecting. Hidden from all lists. */
+	deletedAt?: string;
 }
 
 /** A planned set inside a template. Which fields apply depends on the exercise's trackingType. */
@@ -78,6 +83,8 @@ export interface Template {
 	groups: SupersetGroup[];
 	createdAt: string; // ISO
 	updatedAt: string; // ISO
+	/** ISO tombstone — see Exercise.deletedAt */
+	deletedAt?: string;
 	// muscles / equipment / estimated duration are DERIVED at read time (compute.ts)
 }
 
@@ -117,6 +124,8 @@ export interface WorkoutSession {
 	note?: string;
 	/** ISO — stamped by the repository on every write; powers iCloud sync merge */
 	updatedAt?: string;
+	/** ISO tombstone — see Exercise.deletedAt */
+	deletedAt?: string;
 }
 
 export interface ProgressionIncrements {

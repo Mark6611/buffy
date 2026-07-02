@@ -29,6 +29,8 @@
 
 	// Sync on launch and whenever the app returns to the foreground — but not more
 	// than once a minute, so rapid app-switching doesn't hammer CloudKit.
+	// (runCloudSync itself serializes overlapping passes and records the last
+	// successful sync time; this only rate-limits how often we ask.)
 	const MIN_SYNC_INTERVAL_MS = 60_000;
 	let lastSyncAttemptMs = 0;
 	async function maybeCloudSync() {
@@ -38,8 +40,7 @@
 		const now = Date.now();
 		if (now - lastSyncAttemptMs < MIN_SYNC_INTERVAL_MS) return;
 		lastSyncAttemptMs = now;
-		const result = await runCloudSync();
-		if (result.ok) localStorage.setItem('buffy:lastCloudSync', new Date().toISOString());
+		await runCloudSync();
 	}
 
 	onMount(() => {
@@ -53,11 +54,11 @@
 		if (workout.active) goto('/workout');
 
 		void maybeCloudSync();
-		if (typeof document !== 'undefined') {
-			document.addEventListener('visibilitychange', () => {
-				if (document.visibilityState === 'visible') void maybeCloudSync();
-			});
-		}
+		const onVisible = () => {
+			if (document.visibilityState === 'visible') void maybeCloudSync();
+		};
+		document.addEventListener('visibilitychange', onVisible);
+		return () => document.removeEventListener('visibilitychange', onVisible);
 	});
 </script>
 

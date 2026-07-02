@@ -4,6 +4,7 @@
 // NOTE: this is NOT Whoop's proprietary Strain (0–21) — that score never enters
 // HealthKit. This is a Buffy intensity read from raw HR: average % heart-rate
 // reserve (Karvonen), observed peak, and time spent in HR zones.
+import { clamp01 } from '$lib/math';
 
 export interface HrSample {
 	bpm: number;
@@ -25,16 +26,12 @@ export type IntensityBand = 'easy' | 'moderate' | 'hard' | 'maximal';
 export interface WorkoutIntensity {
 	avgHr: number;
 	peakHr: number;
-	/** Average % heart-rate reserve, 0–100. */
-	hrReservePct: number;
-	/** 0–100 intensity score (rounded avg %HRR). */
+	/** 0–100 intensity score — this IS the average % heart-rate reserve (rounded avg %HRR). */
 	score: number;
 	band: IntensityBand;
 	/** Fraction of time in each %HRR zone (z1<50, z2 50–60, z3 60–70, z4 70–85, z5≥85). Sums to ~1. */
 	zones: { z1: number; z2: number; z3: number; z4: number; z5: number };
 }
-
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
 function bandFor(score: number): IntensityBand {
 	if (score < 50) return 'easy';
@@ -52,7 +49,10 @@ function zoneFor(hrr: number): keyof WorkoutIntensity['zones'] {
 }
 
 export function computeWorkoutIntensity(input: IntensityInput): WorkoutIntensity | null {
-	const samples = input.samples.filter((s) => typeof s.bpm === 'number' && s.bpm > 0);
+	// Sensor artifacts (optical dropouts, doubled beats) produce physiologically
+	// impossible readings. avgHr uses raw bpm while score uses clamped HRR, so an
+	// absurd sample skews both — drop anything outside a plausible human band.
+	const samples = input.samples.filter((s) => typeof s.bpm === 'number' && s.bpm > 25 && s.bpm < 250);
 	if (!samples.length) return null;
 
 	const resting = typeof input.restingHr === 'number' && input.restingHr > 0 ? input.restingHr : 60;
@@ -102,7 +102,6 @@ export function computeWorkoutIntensity(input: IntensityInput): WorkoutIntensity
 	return {
 		avgHr: Math.round(hrSum / totalW),
 		peakHr,
-		hrReservePct: score,
 		score,
 		band: bandFor(score),
 		zones

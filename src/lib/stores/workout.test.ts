@@ -385,6 +385,18 @@ describe('removeExercise', () => {
 		workout.removeExercise(5);
 		expect(workout.session?.exercises).toHaveLength(1);
 	});
+
+	it('clamps activeEx when the last exercise is removed with every set complete', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // ex 0, 3 sets
+		workout.addExercise(curl); // ex 1, 3 sets
+		for (let e = 0; e < 2; e++) for (let s = 0; s < 3; s++) workout.toggleSet(e, s);
+		expect(workout.activeEx).toBe(1); // nothing incomplete — active stays on the last set
+		workout.removeExercise(1);
+		expect(workout.session?.exercises).toHaveLength(1);
+		expect(workout.activeEx).toBe(0); // in range, not "2/1"
+		expect(workout.activeSet).toBe(0);
+	});
 });
 
 describe('swapExercise', () => {

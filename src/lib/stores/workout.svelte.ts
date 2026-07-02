@@ -17,10 +17,7 @@ import {
 	endRestLiveActivity,
 	readPendingRestAdjustment
 } from '$lib/native';
-
-function newId(): string {
-	return crypto.randomUUID();
-}
+import { newId } from '$lib/id';
 
 // In-progress workouts are persisted here so a backgrounded or killed app (iOS
 // purges the WebView under memory pressure) resumes exactly where it left off,
@@ -345,6 +342,12 @@ class WorkoutStore {
 			this.restForSet = { ...this.restForSet, ex: this.restForSet.ex - 1 };
 		}
 		this.setActiveToFirstIncomplete();
+		// all sets complete: setActiveToFirstIncomplete leaves activeEx untouched,
+		// which can now point past the shortened list (UI would read "2/1")
+		if (this.activeEx >= s.exercises.length) {
+			this.activeEx = Math.max(0, s.exercises.length - 1);
+			this.activeSet = 0;
+		}
 		this.restLiveSync();
 	}
 

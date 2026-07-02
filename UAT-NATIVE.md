@@ -182,7 +182,23 @@ Open `ios/App/App.xcodeproj` in Xcode, then:
      add `iCloud.com.mark.buffy`.
 2. **RestWidget** target → **Signing & Capabilities** → **App Groups** → tick `group.com.mark.buffy`.
 3. Tell me — I'll rebuild via a *signed* archive (which actually embeds these entitlements),
-   verify each one landed, deploy the CloudKit schema to Production, and ship build 7.
+   verify each one landed, and ship build 7. One more shared step at that point: CloudKit's
+   record types must exist in the **Production** environment before TestFlight builds can sync
+   (dev builds create them automatically; TestFlight can't). Easiest path: run the app once
+   from Xcode with sync toggled on (creates the schema in Development), then in the CloudKit
+   Dashboard hit **Deploy Schema Changes to Production**. I'll walk you through it — it's two
+   clicks once build 7 exists.
+
+### Sync hardening (done in code, ahead of build 7)
+The full review of the sync path found real design flaws — all fixed before sync ever goes live:
+- A failed pull previously looked identical to an empty cloud and would have force-pushed the
+  entire local set over newer remote data. Pull failures now abort that data type's pass.
+- Pulls now use CloudKit's zone-changes API (no more silent ~100-record truncation, and no
+  hand-created Dashboard index needed); pushes are chunked under CloudKit's 400-record limit.
+- Deletes are now tombstones that sync like edits — a deleted workout stays deleted on every
+  device instead of resurrecting on the next sync.
+- Overlapping sync passes are serialized, and a pulled record only lands if it's still newer
+  than what's on the device *at write time* (an edit made mid-sync can't be clobbered).
 
 ## Open questions for you
 - iCloud toggle in build 6: does it now show "unavailable" instead of crashing? (It should.)

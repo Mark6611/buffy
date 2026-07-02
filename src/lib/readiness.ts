@@ -6,6 +6,7 @@
 // that score is never exposed through HealthKit. Same inputs, our own transparent
 // formula: today's HRV and resting HR relative to a rolling baseline, plus last
 // night's sleep. Higher HRV, lower resting HR, and more sleep → fresher.
+import { clamp01 } from '$lib/math';
 
 export type ReadinessBand = 'fresh' | 'moderate' | 'strained';
 
@@ -32,7 +33,6 @@ export interface Readiness {
 	components: { hrv?: number; rhr?: number; sleep?: number };
 }
 
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 const isPos = (n: number | undefined): n is number => typeof n === 'number' && n > 0;
 const isNonNeg = (n: number | undefined): n is number => typeof n === 'number' && n >= 0;
 
@@ -66,9 +66,14 @@ export function computeReadiness(input: ReadinessInput): Readiness | null {
 		components.sleep = clamp01(input.sleepHours / target);
 	}
 
-	const present = Object.entries(components) as [keyof typeof W, number][];
-	if (!present.length) return null;
+	// Sleep alone can't establish readiness: it's an absolute attainment fraction
+	// (8h ⇒ 1.0) while HRV/RHR are baseline-centred at 0.5, so with weight
+	// renormalisation a sleep-only night would read as perfect freshness. That
+	// input is realistic — iPhone-only sleep tracking writes sleep but no HRV/RHR
+	// — so require at least one autonomic signal before emitting a score.
+	if (components.hrv === undefined && components.rhr === undefined) return null;
 
+	const present = Object.entries(components) as [keyof typeof W, number][];
 	const wsum = present.reduce((a, [k]) => a + W[k], 0);
 	const raw = present.reduce((a, [k, v]) => a + W[k] * v, 0) / wsum;
 	const score = Math.round(raw * 100);

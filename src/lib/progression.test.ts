@@ -72,6 +72,34 @@ describe('computeSuggestion', () => {
 		expect(sg?.stepLabel).toBe('+5s');
 		expect(sg?.last).toBe('0:45 hold');
 	});
+	it('time-hold target hit → +5s', () => {
+		const sg = computeSuggestion(
+			exercise({ id: 'pl', trackingType: 'time_hold', loadType: 'bodyweight', defaultTargetDurationSec: 45 }),
+			session('pl', [set({ durationSec: 45 })])
+		);
+		expect(sg?.hit).toBe(true);
+		expect(sg?.stepLabel).toBe('+5s');
+	});
+	it('time-hold target missed → hold', () => {
+		const sg = computeSuggestion(
+			exercise({ id: 'pl', trackingType: 'time_hold', loadType: 'bodyweight', defaultTargetDurationSec: 60 }),
+			session('pl', [set({ durationSec: 30 })])
+		);
+		expect(sg?.hit).toBe(false);
+		expect(sg?.stepLabel).toBe('hold');
+		expect(sg?.heldForRecovery).toBe(false);
+		expect(sg?.last).toBe('0:30 hold');
+	});
+	it('time-hold target hit while strained → held for recovery', () => {
+		const sg = computeSuggestion(
+			exercise({ id: 'pl', trackingType: 'time_hold', loadType: 'bodyweight', defaultTargetDurationSec: 45 }),
+			session('pl', [set({ durationSec: 50 })]),
+			{ readiness: 'strained' }
+		);
+		expect(sg?.hit).toBe(true);
+		expect(sg?.stepLabel).toBe('hold · recovery');
+		expect(sg?.heldForRecovery).toBe(true);
+	});
 	it('cardio → null (log-only)', () => {
 		const sg = computeSuggestion(
 			exercise({ id: 'tm', trackingType: 'cardio', loadType: 'total' }),

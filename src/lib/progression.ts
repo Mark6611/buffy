@@ -44,13 +44,19 @@ export function computeSuggestion(
 	if (ex.trackingType === 'cardio') return null;
 	if (ex.trackingType === 'time_hold') {
 		const lastDur = Math.max(...working.map((s) => s.durationSec ?? 0));
+		// Not format.mmss() — that pads minutes to two digits ("00:45"); holds read as "0:45".
 		const m = Math.floor(lastDur / 60);
 		const r = lastDur % 60;
+		const target = ex.defaultTargetDurationSec;
+		// No target duration configured → the historical always-advance behavior.
+		const hit = typeof target !== 'number' || lastDur >= target;
+		const held = hit && strained;
+		const advance = hit && !strained;
 		return {
 			last: `${m}:${String(r).padStart(2, '0')} hold`,
-			stepLabel: strained ? 'hold · recovery' : '+5s',
-			hit: true,
-			heldForRecovery: strained
+			stepLabel: advance ? '+5s' : held ? 'hold · recovery' : 'hold',
+			hit,
+			heldForRecovery: held
 		};
 	}
 

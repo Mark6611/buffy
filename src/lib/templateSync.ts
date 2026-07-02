@@ -2,6 +2,7 @@
 // one from a quick-log session). Pure and testable — the route wires these into
 // repo.upsertTemplate; nothing here touches storage directly.
 import type { Exercise, LoggedExercise, PlannedSet, Template, TemplateExercise, WorkoutSession } from '$lib/types';
+import { newId } from '$lib/id';
 
 /** Map a finished session's logged (completed-only) sets into template shape.
  *  Rest target prefers what was actually taken; falls back to the exercise's
@@ -35,9 +36,17 @@ export function applyFullSync(template: Template, session: WorkoutSession, exByI
  *  template, matched by exercise + set index. Never changes the exercise list, set
  *  counts, rest targets, or grouping — those stay exactly as the template had them. */
 export function applyWeightsOnlySync(template: Template, session: WorkoutSession): Template {
-	const byExerciseId = new Map(session.exercises.map((le) => [le.exerciseId, le]));
+	// The same exercise can appear twice in a session (the workout store allows
+	// it), so pair by occurrence order — 1st template occurrence takes the 1st
+	// session occurrence's numbers, 2nd takes the 2nd — never collapse by id.
+	const queues = new Map<string, LoggedExercise[]>();
+	for (const le of session.exercises) {
+		const q = queues.get(le.exerciseId);
+		if (q) q.push(le);
+		else queues.set(le.exerciseId, [le]);
+	}
 	const exercises = template.exercises.map((tex) => {
-		const le = byExerciseId.get(tex.exerciseId);
+		const le = queues.get(tex.exerciseId)?.shift();
 		if (!le) return tex;
 		const plannedSets = tex.plannedSets.map((ps, i) => {
 			const set = le.sets[i];
@@ -61,7 +70,7 @@ export function applyWeightsOnlySync(template: Template, session: WorkoutSession
 export function buildTemplateFromSession(session: WorkoutSession, exById: Map<string, Exercise>, name: string): Template {
 	const now = new Date().toISOString();
 	return {
-		id: crypto.randomUUID(),
+		id: newId(),
 		name,
 		exercises: session.exercises.map((le) => loggedExerciseToTemplateExercise(le, exById)),
 		groups: [], // quick-log never groups exercises today — no UI path creates a groupId

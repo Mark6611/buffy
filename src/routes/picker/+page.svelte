@@ -11,10 +11,13 @@
 	import Thumb from '$lib/components/Thumb.svelte';
 
 	const to = $derived($page.url.searchParams.get('to') ?? 'workout');
+	// swap mode only for a real slot index — Number('') is 0, so a bare `?swap=`
+	// (or junk) must fall back to add mode, not silently swap exercise 0
 	const swapIndex = $derived.by(() => {
 		const raw = $page.url.searchParams.get('swap');
-		const n = raw != null ? Number(raw) : NaN;
-		return Number.isFinite(n) ? n : null;
+		if (raw == null || !/^\d+$/.test(raw)) return null;
+		const n = Number(raw);
+		return n < workout.exerciseCount ? n : null;
 	});
 	let all = $state<Exercise[]>([]);
 	let q = $state('');

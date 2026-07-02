@@ -25,7 +25,11 @@ public class RestActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 		let endDate = Date(timeIntervalSince1970: endMs / 1000.0)
 		guard endDate > Date() else { call.resolve(); return }
 
-		RestActivityPlugin.endAllActivities()
+		// Snapshot the stale activities BEFORE requesting the new one. endAllActivities'
+		// fire-and-forget Task enumerates .activities at some later point on another
+		// executor — if that snapshot happened after the request registered, it would
+		// end the activity we just started (the countdown flashes and vanishes).
+		let stale = Activity<RestActivityAttributes>.activities
 		let state = RestActivityAttributes.ContentState(startDate: startDate, endDate: endDate, label: label)
 		do {
 			_ = try Activity.request(
@@ -33,6 +37,11 @@ public class RestActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 				content: .init(state: state, staleDate: endDate.addingTimeInterval(120)),
 				pushType: nil
 			)
+			Task {
+				for activity in stale {
+					await activity.end(nil, dismissalPolicy: .immediate)
+				}
+			}
 			call.resolve()
 		} catch {
 			call.reject("Live Activity start failed: \(error.localizedDescription)")

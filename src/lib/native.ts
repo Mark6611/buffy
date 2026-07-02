@@ -331,25 +331,20 @@ export async function cloudSyncIsAvailable(): Promise<boolean> {
 	}
 }
 
-/** Fetch every CloudKit record of `type` from the private database. */
+/** Fetch every CloudKit record of `type` from the private database.
+ *  THROWS on failure — deliberately. A swallowed error here would be
+ *  indistinguishable from a genuinely empty cloud, and the sync pass would
+ *  respond to "empty" by force-pushing the entire local set over whatever
+ *  newer data the failure was hiding. The caller aborts the type instead. */
 export async function cloudSyncPull(type: string): Promise<CloudRecord[]> {
 	if (!isNative) return [];
-	try {
-		const { recordsJson } = await CloudSync.pull({ type });
-		return JSON.parse(recordsJson) as CloudRecord[];
-	} catch {
-		return [];
-	}
+	const { recordsJson } = await CloudSync.pull({ type });
+	return JSON.parse(recordsJson) as CloudRecord[];
 }
 
 /** Upsert records of `type` to CloudKit — overwrites the server copy (the merge
- *  decision already happened on the JS side before this is called). */
-export async function cloudSyncPush(type: string, records: CloudRecord[]): Promise<boolean> {
-	if (!isNative || records.length === 0) return true;
-	try {
-		await CloudSync.push({ type, recordsJson: JSON.stringify(records) });
-		return true;
-	} catch {
-		return false;
-	}
+ *  decision already happened on the JS side before this is called). Throws on failure. */
+export async function cloudSyncPush(type: string, records: CloudRecord[]): Promise<void> {
+	if (!isNative || records.length === 0) return;
+	await CloudSync.push({ type, recordsJson: JSON.stringify(records) });
 }

@@ -59,9 +59,24 @@ describe('computeReadiness', () => {
 		expect(lo.components.hrv).toBe(0);
 	});
 
+	it('sleep alone never scores — needs an autonomic signal (HRV or RHR)', () => {
+		// 8h of sleep with no HRV/RHR would renormalise to 100/'fresh'. Realistic
+		// input: iPhone-only sleep tracking writes sleep but no autonomic data.
+		expect(computeReadiness({ sleepHours: 8 })).toBeNull();
+		expect(computeReadiness({ sleepHours: 7, sleepTargetHours: 7 })).toBeNull();
+	});
+
 	it('respects a custom sleep target', () => {
-		const r = computeReadiness({ sleepHours: 7, sleepTargetHours: 7 })!;
+		const r = computeReadiness({ hrvMs: 60, hrvBaselineMs: 60, sleepHours: 7, sleepTargetHours: 7 })!;
 		expect(r.components.sleep).toBe(1);
+	});
+
+	it('sleepHours 0 is a real signal (contributes 0); undefined is skipped', () => {
+		const zero = computeReadiness({ hrvMs: 60, hrvBaselineMs: 60, sleepHours: 0 })!;
+		expect(zero.components.sleep).toBe(0);
+		const skipped = computeReadiness({ hrvMs: 60, hrvBaselineMs: 60 })!;
+		expect(skipped.components.sleep).toBeUndefined();
+		expect(zero.score).toBeLessThan(skipped.score);
 	});
 
 	it('bandFor thresholds', () => {

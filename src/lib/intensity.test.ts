@@ -14,7 +14,7 @@ describe('computeWorkoutIntensity', () => {
 		const r = computeWorkoutIntensity({ samples: bpms([120, 120]), restingHr: 60, maxHr: 180 })!;
 		expect(r.avgHr).toBe(120);
 		expect(r.peakHr).toBe(120);
-		expect(r.hrReservePct).toBe(50);
+		expect(r.score).toBe(50);
 		expect(r.band).toBe('moderate');
 	});
 
@@ -30,14 +30,14 @@ describe('computeWorkoutIntensity', () => {
 	it('derives max HR from age when not given (Tanaka)', () => {
 		// age 40 → max 180. resting default 60 → reserve 120. bpm 120 → 0.5.
 		const r = computeWorkoutIntensity({ samples: bpms([120]), age: 40 })!;
-		expect(r.hrReservePct).toBe(50);
+		expect(r.score).toBe(50);
 	});
 
 	it('clamps HRR into [0,1] for sub-resting and supra-max HR', () => {
-		const r = computeWorkoutIntensity({ samples: bpms([40, 250]), restingHr: 60, maxHr: 180 })!;
+		const r = computeWorkoutIntensity({ samples: bpms([40, 240]), restingHr: 60, maxHr: 180 })!;
 		// one sample below resting (→0), one above max (→1), equal weight → 0.5
-		expect(r.hrReservePct).toBe(50);
-		expect(r.peakHr).toBe(250);
+		expect(r.score).toBe(50);
+		expect(r.peakHr).toBe(240);
 	});
 
 	it('time-weights irregular samples', () => {
@@ -71,5 +71,43 @@ describe('computeWorkoutIntensity', () => {
 			maxHr: 180
 		})!;
 		expect(r.avgHr).toBe(120);
+	});
+
+	it('mixed timestamps (only some samples timed) fall back to equal weighting', () => {
+		const r = computeWorkoutIntensity({
+			samples: [{ bpm: 100, atMs: 0 }, { bpm: 160, atMs: 90_000 }, { bpm: 160 }],
+			restingHr: 60,
+			maxHr: 180
+		})!;
+		expect(r.avgHr).toBe(140); // plain mean — no time-weighting without full timestamps
+	});
+
+	it('unsorted timestamps give the same result as sorted (order independence)', () => {
+		const sorted = computeWorkoutIntensity({
+			samples: [
+				{ bpm: 100, atMs: 0 },
+				{ bpm: 160, atMs: 90_000 },
+				{ bpm: 160, atMs: 100_000 }
+			],
+			restingHr: 60,
+			maxHr: 180
+		})!;
+		const shuffled = computeWorkoutIntensity({
+			samples: [
+				{ bpm: 160, atMs: 100_000 },
+				{ bpm: 100, atMs: 0 },
+				{ bpm: 160, atMs: 90_000 }
+			],
+			restingHr: 60,
+			maxHr: 180
+		})!;
+		expect(shuffled).toEqual(sorted);
+	});
+
+	it('drops physiologically implausible artifact samples (bpm ≤ 25 or ≥ 250)', () => {
+		const r = computeWorkoutIntensity({ samples: bpms([10, 300, 120]), restingHr: 60, maxHr: 180 })!;
+		expect(r.avgHr).toBe(120);
+		expect(r.peakHr).toBe(120); // a 300 bpm artifact never becomes the peak
+		expect(computeWorkoutIntensity({ samples: bpms([5, 260]) })).toBeNull();
 	});
 });

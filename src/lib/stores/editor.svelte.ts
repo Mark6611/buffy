@@ -1,10 +1,7 @@
 // Draft state for the template editor. Edits a working copy; commits via save().
 import { getRepository } from '$lib/db';
+import { newId } from '$lib/id';
 import type { Exercise, PlannedSet, Template } from '$lib/types';
-
-function nid(): string {
-	return crypto.randomUUID();
-}
 
 function defaultSets(ex: Exercise): PlannedSet[] {
 	const rest = ex.defaultRestSec ?? 90;
@@ -34,7 +31,7 @@ class EditorStore {
 		this.loadedFor = id;
 		if (id === 'new') {
 			const iso = new Date().toISOString();
-			this.draft = { id: nid(), name: 'New Template', exercises: [], groups: [], createdAt: iso, updatedAt: iso };
+			this.draft = { id: newId(), name: 'New Template', exercises: [], groups: [], createdAt: iso, updatedAt: iso };
 		} else {
 			const t = await repo.getTemplate(id);
 			this.draft = t ? (structuredClone(t) as Template) : null;
@@ -78,7 +75,7 @@ class EditorStore {
 	groupSelected() {
 		if (!this.draft || this.selection.size < 2) return;
 		const idxs = [...this.selection].sort((a, b) => a - b);
-		const gid = nid();
+		const gid = newId();
 		const picked = idxs.map((i) => this.draft!.exercises[i]);
 		picked.forEach((p) => (p.groupId = gid));
 		const first = idxs[0];
