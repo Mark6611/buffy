@@ -401,6 +401,35 @@ class WorkoutStore {
 		this.suggestions[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
 	}
 
+	/** Move an exercise one slot up/down. Superset blocks travel as UNITS — the
+	 *  group chip and round-cycling both assume members stay adjacent, so a
+	 *  grouped exercise drags its partners along and a neighbor group is jumped
+	 *  over whole. */
+	moveExercise(exIndex: number, dir: -1 | 1) {
+		const s = this.session;
+		if (!s || !s.exercises[exIndex]) return;
+		const own = this.groupBounds(exIndex);
+		const neighborIndex = dir === -1 ? own.start - 1 : own.end + 1;
+		if (neighborIndex < 0 || neighborIndex >= s.exercises.length) return;
+		const other = this.groupBounds(neighborIndex);
+		const [top, bottom] = dir === -1 ? [other, own] : [own, other];
+		// remap the rest pointer by object identity — index math across two moving
+		// blocks is exactly the kind of arithmetic that grows off-by-ones
+		const restLe = this.restForSet ? s.exercises[this.restForSet.ex] : null;
+		const swapBlocks = <T,>(arr: T[]) => {
+			const block = arr.splice(bottom.start, bottom.end - bottom.start + 1);
+			arr.splice(top.start, 0, ...block);
+		};
+		swapBlocks(s.exercises);
+		swapBlocks(this.meta);
+		swapBlocks(this.plannedRest);
+		if (restLe && this.restForSet) {
+			this.restForSet = { ...this.restForSet, ex: s.exercises.indexOf(restLe) };
+		}
+		this.setActiveToFirstIncomplete();
+		this.restLiveSync();
+	}
+
 	addSet(exIndex: number) {
 		const le = this.session?.exercises[exIndex];
 		if (!le) return;
@@ -471,23 +500,19 @@ class WorkoutStore {
 			const prev = this.session!.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
 			if (prev) prev.restTakenSec = Math.max(0, Math.round(this.restElapsedSec));
 		}
-		if (this.isMidSupersetRound(exIndex, setIndex)) {
-			// superset: no rest between exercises within a round — go straight to the next
-			this.restRunning = false;
-			this.restForSet = null;
-			this.restSeedSec = 0;
-			this.restAccumSec = 0;
-			this.restStartedAtMs = 0;
-			this.restHapticFired = false;
-		} else {
-			// start resting for this set — wall-clock from now
-			this.restSeedSec = this.plannedRest[exIndex]?.[setIndex] ?? settings.current.defaultRestSec;
-			this.restForSet = { ex: exIndex, set: setIndex };
-			this.restStartedAtMs = Date.now();
-			this.restAccumSec = 0;
-			this.restRunning = true;
-			this.restHapticFired = false;
-		}
+		// The timer starts after EVERY logged set — regardless of which exercise or
+		// which set, in or out of the template's order. Supersets keep their
+		// round-cycling active pointer (A1→B1→A2…), but no longer suppress the
+		// timer mid-round: suppression meant that deviating from the round flow
+		// (straight sets on one member) silently never started a rest at all. When
+		// you do fly straight to the partner exercise, this rest simply gets folded
+		// into that set as a few seconds of recorded rest — harmless.
+		this.restSeedSec = this.plannedRest[exIndex]?.[setIndex] ?? settings.current.defaultRestSec;
+		this.restForSet = { ex: exIndex, set: setIndex };
+		this.restStartedAtMs = Date.now();
+		this.restAccumSec = 0;
+		this.restRunning = true;
+		this.restHapticFired = false;
 		this.nowMs = Date.now();
 		this.setActiveToFirstIncomplete();
 		this.restLiveSync();
@@ -595,19 +620,6 @@ class WorkoutStore {
 
 	/** True if finishing (exIndex, round) is a mid-superset step — another exercise in
 	 *  the group still owes that round — so we go straight on with no rest between. */
-	private isMidSupersetRound(exIndex: number, round: number): boolean {
-		const s = this.session;
-		if (!s) return false;
-		const { start, end } = this.groupBounds(exIndex);
-		if (end === start) return false;
-		for (let g = start; g <= end; g++) {
-			if (g === exIndex) continue;
-			const set = s.exercises[g].sets[round];
-			if (set && !set.completed) return true;
-		}
-		return false;
-	}
-
 	// Advance in superset round order: set r of every exercise in a group (A1→B1→A2→B2…)
 	// before moving on. Standalone exercises log linearly (a group of one).
 	private setActiveToFirstIncomplete() {

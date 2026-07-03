@@ -243,7 +243,7 @@ describe('restore — resume after app restart', () => {
 });
 
 describe('superset round-cycling', () => {
-	it('cycles A1→B1→A2→B2 within a group, resting only after the round', () => {
+	it('cycles A1→B1→A2→B2 within a group, timer running after every set', () => {
 		const session: WorkoutSession = {
 			id: 'ss',
 			startedAt: new Date(BASE).toISOString(),
@@ -272,13 +272,13 @@ describe('superset round-cycling', () => {
 		expect([workout.activeEx, workout.activeSet]).toEqual([0, 0]); // A1
 		workout.toggleSet(0, 0);
 		expect([workout.activeEx, workout.activeSet]).toEqual([1, 0]); // → B1
-		expect(workout.restForSet).toBeNull(); // no rest mid-superset
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 }); // timer runs even mid-round
 		workout.toggleSet(1, 0);
 		expect([workout.activeEx, workout.activeSet]).toEqual([0, 1]); // → A2
-		expect(workout.restForSet).toEqual({ ex: 1, set: 0 }); // rest after the round
+		expect(workout.restForSet).toEqual({ ex: 1, set: 0 });
 		workout.toggleSet(0, 1);
 		expect([workout.activeEx, workout.activeSet]).toEqual([1, 1]); // → B2
-		expect(workout.restForSet).toBeNull();
+		expect(workout.restForSet).toEqual({ ex: 0, set: 1 });
 	});
 
 	it('non-grouped exercises stay linear', () => {
@@ -320,6 +320,19 @@ describe('interactive Live Activity reconciliation', () => {
 		expect(workout.restRemaining).toBeCloseTo(30, 0);
 	});
 });
+
+const row: Exercise = {
+	id: 'row',
+	name: 'Cable Row',
+	equipment: 'cable',
+	primaryMuscles: ['Back'],
+	secondaryMuscles: [],
+	trackingType: 'weight_reps',
+	loadType: 'total',
+	defaultTargetReps: 10,
+	weightStep: 2.5,
+	defaultRestSec: 60
+};
 
 const curl: Exercise = {
 	id: 'curl',
@@ -504,5 +517,55 @@ describe('addSet / removeSetAt', () => {
 		expect(workout.plannedRest[0]).toHaveLength(before + 1);
 		expect(workout.activeEx).toBe(0);
 		expect(workout.activeSet).toBe(before);
+	});
+});
+
+describe('moveExercise', () => {
+	it('swaps a standalone exercise with its neighbor (both directions, arrays in lockstep)', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // 0
+		workout.addExercise(curl); // 1
+		workout.moveExercise(0, 1);
+		expect(workout.session!.exercises.map((e) => e.exerciseId)).toEqual(['curl', 'press']);
+		expect(workout.meta.map((e) => e.id)).toEqual(['curl', 'press']);
+		workout.moveExercise(1, -1);
+		expect(workout.session!.exercises.map((e) => e.exerciseId)).toEqual(['press', 'curl']);
+	});
+
+	it('is a no-op at the boundaries', () => {
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.addExercise(curl);
+		workout.moveExercise(0, -1);
+		workout.moveExercise(1, 1);
+		expect(workout.session!.exercises.map((e) => e.exerciseId)).toEqual(['press', 'curl']);
+	});
+
+	it('keeps the rest pointer on the same set through a move', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // 0
+		workout.addExercise(curl); // 1
+		workout.toggleSet(0, 0); // rest against press set 0
+		expect(workout.restForSet).toEqual({ ex: 0, set: 0 });
+		workout.moveExercise(0, 1); // press moves to index 1
+		expect(workout.restForSet).toEqual({ ex: 1, set: 0 });
+		expect(workout.session!.exercises[1].exerciseId).toBe('press');
+		expect(workout.restRunning).toBe(true);
+	});
+
+	it('moves a superset block as a unit and jumps a standalone neighbor over it', () => {
+		workout.startAdhoc();
+		workout.addExercise(press); // 0 standalone
+		workout.addExercise(curl); // 1
+		workout.addExercise(row); // 2
+		// group curl+row as a superset block
+		workout.session!.exercises[1].groupId = 'g';
+		workout.session!.exercises[2].groupId = 'g';
+		workout.moveExercise(1, -1); // move the BLOCK up past press
+		expect(workout.session!.exercises.map((e) => e.exerciseId)).toEqual(['curl', 'row', 'press']);
+		expect(workout.meta.map((e) => e.id)).toEqual(['curl', 'row', 'press']);
+		// moving the standalone back up jumps the whole block
+		workout.moveExercise(2, -1);
+		expect(workout.session!.exercises.map((e) => e.exerciseId)).toEqual(['press', 'curl', 'row']);
 	});
 });

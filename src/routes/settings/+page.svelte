@@ -85,6 +85,14 @@
 		}
 	}
 
+	// script-level guard — see home's whoopToday note (compiler paren-drop bug)
+	const whoopTodayRow = $derived.by(() => {
+		const t = whoop.today;
+		if (!t) return null;
+		const hasAny = typeof t.recoveryScore === 'number' || typeof t.dayStrain === 'number';
+		return hasAny ? t : null;
+	});
+
 	// One export pipeline for the whole app ($lib/data): native-safe (an
 	// <a download> click is a silent no-op inside a WebView) and produces the
 	// envelope the importer on the Backup screen actually accepts.
@@ -221,12 +229,12 @@
 							{/if}
 						</div>
 						{#if whoop.connected}
-							{#if whoop.today && (whoop.today.recoveryScore != null || whoop.today.dayStrain != null)}
+							{#if whoopTodayRow}
 								<div class="divider"></div>
 								<div class="row" style="justify-content:space-between">
 									<div style="font-weight:500">Today</div>
 									<span class="txt-sm mono">
-										{whoop.today.recoveryScore != null ? `recovery ${whoop.today.recoveryScore}` : 'recovery pending'}{whoop.today.dayStrain != null ? ` · strain ${whoop.today.dayStrain.toFixed(1)}` : ''}{whoop.today.sleepPerformancePct != null ? ` · sleep ${whoop.today.sleepPerformancePct}%` : ''}
+										{whoopTodayRow.recoveryScore != null ? `recovery ${whoopTodayRow.recoveryScore}` : 'recovery pending'}{whoopTodayRow.dayStrain != null ? ` · strain ${whoopTodayRow.dayStrain.toFixed(1)}` : ''}{whoopTodayRow.sleepPerformancePct != null ? ` · sleep ${whoopTodayRow.sleepPerformancePct}%` : ''}
 									</span>
 								</div>
 							{/if}

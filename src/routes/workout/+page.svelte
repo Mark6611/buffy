@@ -165,6 +165,12 @@
 	}
 
 	// Swipeable exercise-header rows: opening one closes any other that's open.
+	function moveExercise(exIndex: number, dir: -1 | 1) {
+		workout.moveExercise(exIndex, dir);
+		// indices just changed under every open row — snap them all shut
+		swipeRefs.forEach((r) => r?.close());
+	}
+
 	let swipeRefs: (SwipeActions | undefined)[] = $state([]);
 	function closeOtherSwipes(exIndex: number) {
 		swipeRefs.forEach((r, i) => {
@@ -268,7 +274,7 @@
 					{@const tt = ex?.trackingType ?? 'weight_reps'}
 					{@const sg = workout.suggestions[le.exerciseId]}
 					<div class="ex-block">
-						<SwipeActions bind:this={swipeRefs[exIndex]} onOpen={() => closeOtherSwipes(exIndex)}>
+						<SwipeActions bind:this={swipeRefs[exIndex]} actionsWidth={240} onOpen={() => closeOtherSwipes(exIndex)}>
 							{#snippet children()}
 								<div class="ex-head">
 									<Thumb equip={ex?.equipment ?? 'dumbbell'} />
@@ -287,6 +293,8 @@
 								</div>
 							{/snippet}
 							{#snippet actions()}
+								<button class="swipe-btn" style="background:var(--ink-3);width:44px;font-size:16px" aria-label="Move up" onclick={() => moveExercise(exIndex, -1)}>↑</button>
+								<button class="swipe-btn" style="background:var(--ink-3);width:44px;font-size:16px" aria-label="Move down" onclick={() => moveExercise(exIndex, 1)}>↓</button>
 								<button class="swipe-btn" style="background:var(--accent)" onclick={() => swapExercise(exIndex)}>
 									<Icon name="swap" size={18} color="#fff" sw={2.2} />
 									<span>Swap</span>

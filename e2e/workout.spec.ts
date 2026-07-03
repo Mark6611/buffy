@@ -165,3 +165,32 @@ test('a set row can be added and swipe-deleted mid-workout', async ({ page }) =>
 	await page.mouse.up();
 	await expect(rows).toHaveCount(1);
 });
+
+test('exercises can be reordered from the swipe actions', async ({ page }) => {
+	await page.getByRole('button', { name: /Shoulder Core/ }).first().click();
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await expect(page).toHaveURL(/\/workout/);
+
+	const names = page.locator('.ex-name');
+	const first = await names.first().textContent();
+	const blocks = page.locator('.ex-block');
+	await swipeOpen(page, blocks.first().locator('.swipe-content'));
+	await blocks.first().getByRole('button', { name: 'Move down' }).click();
+	await expect(names.first()).not.toHaveText(first!);
+	// and back up
+	const lastIdx = (await blocks.count()) - 1;
+	// the moved exercise sits wherever it landed — move whichever is now first down was enough; assert order actually changed
+});
+
+test('the rest timer starts even when logging out of the superset round order', async ({ page }) => {
+	// Shoulder Core is a superset template — previously, completing a set while the
+	// partner exercise's same-round set was incomplete suppressed the timer entirely.
+	await page.getByRole('button', { name: /Shoulder Core/ }).first().click();
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await expect(page).toHaveURL(/\/workout/);
+
+	// log the SECOND set of the first exercise (out of round order)
+	const firstBlock = page.locator('.ex-block').first();
+	await firstBlock.locator('button[aria-label="toggle set"]').nth(1).click();
+	await expect(page.locator('.rest-banner')).toBeVisible();
+});

@@ -38,6 +38,20 @@
 		month: 'short'
 	});
 
+	// NB: guard computed in script, not inline in {#if}: this Svelte version's
+	// dev transform drops the parentheses around `a && (b != null || c != null)`
+	// when rewriting != into $.equals, flattening precedence and dereferencing
+	// null — the compiled page crashed on first paint. (Compiler bug; avoid the
+	// pattern rather than fight it.)
+	const whoopToday = $derived.by(() => {
+		const t = whoop.today;
+		if (!t) return null;
+		// pure || chain of typeof checks — no &&/|| precedence for the transform to lose
+		const hasAny =
+			typeof t.recoveryScore === 'number' || typeof t.dayStrain === 'number' || typeof t.sleepHours === 'number';
+		return hasAny ? t : null;
+	});
+
 	function hhmmFromHours(h: number): string {
 		const totalMin = Math.round(h * 60);
 		return `${Math.floor(totalMin / 60)}:${String(totalMin % 60).padStart(2, '0')}`;
@@ -77,8 +91,8 @@
 			</div>
 		</div>
 
-		{#if whoop.today && (whoop.today.recoveryScore != null || whoop.today.dayStrain != null || whoop.today.sleepHours != null)}
-			{@const t = whoop.today}
+		{#if whoopToday}
+			{@const t = whoopToday}
 			<div class="pad" style="margin-bottom:18px">
 				<button
 					class="card card-pad"
