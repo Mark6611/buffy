@@ -37,6 +37,10 @@ export interface WhoopToday {
 	hrvMs?: number;
 	/** day strain, 0–21 */
 	dayStrain?: number;
+	/** sleep performance %, 0–100 */
+	sleepPerformancePct?: number;
+	/** last night's actual sleep (light+SWS+REM), hours */
+	sleepHours?: number;
 }
 
 export interface WhoopWorkout {
@@ -287,6 +291,28 @@ class WhoopStore {
 			out.recoveryScore = rec.score.recovery_score;
 			out.restingHr = rec.score.resting_heart_rate;
 			out.hrvMs = rec.score.hrv_rmssd_milli;
+		}
+		const sleep = (await this.get(`/v2/cycle/${cycle.id}/sleep`)) as
+			| {
+					score_state?: string;
+					score?: {
+						sleep_performance_percentage?: number;
+						stage_summary?: {
+							total_light_sleep_time_milli?: number;
+							total_slow_wave_sleep_time_milli?: number;
+							total_rem_sleep_time_milli?: number;
+						};
+					};
+			  }
+			| null;
+		if (sleep?.score_state === 'SCORED' && sleep.score) {
+			out.sleepPerformancePct = sleep.score.sleep_performance_percentage;
+			const st = sleep.score.stage_summary;
+			const ms =
+				(st?.total_light_sleep_time_milli ?? 0) +
+				(st?.total_slow_wave_sleep_time_milli ?? 0) +
+				(st?.total_rem_sleep_time_milli ?? 0);
+			if (ms > 0) out.sleepHours = ms / 3_600_000;
 		}
 		this.today = out;
 		this.todayFetchedMs = Date.now();

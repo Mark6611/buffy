@@ -7,7 +7,9 @@
 	import { kpis } from '$lib/analytics';
 	import { syncWidget } from '$lib/widgetSync';
 	import { recovery } from '$lib/stores/recovery.svelte';
+	import { whoop } from '$lib/stores/whoop.svelte';
 	import type { Template, Exercise, WorkoutSession } from '$lib/types';
+	import Kpi from '$lib/components/Kpi.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import EqChip from '$lib/components/EqChip.svelte';
@@ -35,6 +37,11 @@
 		day: 'numeric',
 		month: 'short'
 	});
+
+	function hhmmFromHours(h: number): string {
+		const totalMin = Math.round(h * 60);
+		return `${Math.floor(totalMin / 60)}:${String(totalMin % 60).padStart(2, '0')}`;
+	}
 </script>
 
 <div class="screen">
@@ -69,6 +76,28 @@
 				</button>
 			</div>
 		</div>
+
+		{#if whoop.today && (whoop.today.recoveryScore != null || whoop.today.dayStrain != null || whoop.today.sleepHours != null)}
+			{@const t = whoop.today}
+			<div class="pad" style="margin-bottom:18px">
+				<button
+					class="card card-pad"
+					style="display:flex;justify-content:space-between;width:100%"
+					onclick={() => goto('/settings')}
+					aria-label="Today's Whoop stats — tap for details"
+				>
+					<Kpi v={t.recoveryScore != null ? `${t.recoveryScore}%` : '—'} l="recovery" mono />
+					<span style="width:1px;background:var(--line)"></span>
+					<Kpi v={t.dayStrain != null ? t.dayStrain.toFixed(1) : '—'} l="day strain" mono />
+					<span style="width:1px;background:var(--line)"></span>
+					<Kpi
+						v={t.sleepHours != null ? hhmmFromHours(t.sleepHours) : '—'}
+						l={t.sleepPerformancePct != null ? `sleep · ${t.sleepPerformancePct}%` : 'sleep'}
+						mono
+					/>
+				</button>
+			</div>
+		{/if}
 
 		<div class="pad" style="margin-bottom:18px">
 			<button

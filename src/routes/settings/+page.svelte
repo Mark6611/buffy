@@ -226,7 +226,7 @@
 								<div class="row" style="justify-content:space-between">
 									<div style="font-weight:500">Today</div>
 									<span class="txt-sm mono">
-										{whoop.today.recoveryScore != null ? `recovery ${whoop.today.recoveryScore}` : 'recovery pending'}{whoop.today.dayStrain != null ? ` · strain ${whoop.today.dayStrain.toFixed(1)}` : ''}
+										{whoop.today.recoveryScore != null ? `recovery ${whoop.today.recoveryScore}` : 'recovery pending'}{whoop.today.dayStrain != null ? ` · strain ${whoop.today.dayStrain.toFixed(1)}` : ''}{whoop.today.sleepPerformancePct != null ? ` · sleep ${whoop.today.sleepPerformancePct}%` : ''}
 									</span>
 								</div>
 							{/if}
