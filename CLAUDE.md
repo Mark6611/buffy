@@ -34,6 +34,11 @@ Local-first: the canonical database is on-device IndexedDB; CloudKit is an opt-i
   prod; svelte-check stays green). Early-return instead, then a pure `||` chain of
   `typeof x === 'number'` checks. When in doubt, curl the dev server's compiled output.
 
+## Editing hygiene
+- The `.svelte` files here are large. After a context compaction, Edit's read-state is
+  lost — re-Read a file before Edit-ing it, or the edit fails "File has not been read yet"
+  / "String not found." Prefer several small precise edits over one giant replacement.
+
 ## Shipping (TestFlight)
 - Use `scripts/ship.sh` — never hand-roll the pipeline. It gates on tests, uses the
   MANUAL signing setup (profiles "Buffy App Store" / "Buffy RestWidget App Store";
