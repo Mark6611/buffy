@@ -4,9 +4,13 @@
 #   scripts/ship.sh [build-number] [--dry-run]
 #
 # No build number → current CURRENT_PROJECT_VERSION + 1.
-# --dry-run runs everything up to and including the entitlement check, then stops
-# (no upload, no version left bumped? — the bump IS applied; rerun without the flag
-# to ship the same number).
+# --dry-run runs everything up to and including the entitlement check, then RESTORES
+# the project.pbxproj (a dry run leaves NO source change and consumes no build number).
+#
+# On SUCCESS the pbxproj version bump is auto-committed and pushed — the pipeline is
+# end-to-end. On FAILURE the bump is restored so a rerun computes the same number.
+# Commit your FEATURE changes before running this; only the version-bump commit is made
+# here.
 #
 # Why each unusual step exists (learned the hard way — see CLAUDE.md):
 #  * gates are never piped: `test | tail` reads tail's exit code and once shipped a
@@ -17,6 +21,19 @@
 #  * an uploaded build is INVISIBLE on the phone until assigned to the tester group
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+PBXPROJ=ios/App/App.xcodeproj/project.pbxproj
+# Restore the pbxproj bump on any early exit (failure or dry-run); cleared once the
+# build is safely uploaded, after which the bump is committed instead.
+RESTORE_PBXPROJ=1
+cleanup() { [ "$RESTORE_PBXPROJ" = "1" ] && git checkout -- "$PBXPROJ" 2>/dev/null || true; }
+trap cleanup EXIT
+
+# Advisory: shipping commits ONLY the version bump. Warn if other work is uncommitted
+# so it isn't accidentally left out of the push that follows.
+if [ -n "$(git status --porcelain -- . ':!'"$PBXPROJ" 2>/dev/null)" ]; then
+	echo "── note: uncommitted changes besides the version bump — commit feature work first if it should ship in this push."
+fi
 
 ASC_KEY_ID="DUPV266J6S"
 ASC_ISSUER="b0021702-5324-4cc1-9ddd-66a5a1535fe6"
@@ -85,8 +102,8 @@ VERS=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" /tmp/ship-ipa/Payload
 echo "   entitlements + version OK"
 
 if [ "$DRY_RUN" = "1" ]; then
-	echo "── dry run: stopping before upload. IPA at $EXPORT/App.ipa (build $BUILD_NUM)"
-	exit 0
+	echo "── dry run: stopping before upload. IPA at $EXPORT/App.ipa (build $BUILD_NUM). Restoring pbxproj (no bump kept)."
+	exit 0  # the EXIT trap restores project.pbxproj — a dry run mutates nothing
 fi
 
 echo "══ Upload"
@@ -118,7 +135,9 @@ def api(method, path, body=None):
 deadline = time.time() + 30 * 60
 build_id = None
 while time.time() < deadline:
-    st, b = api("GET", f"/v1/builds?filter[app]={APP}&filter[version]={BUILD}")
+    # sort newest-first and take the freshest matching build — never assume the API
+    # returns them ordered, and never bind to a stale prior upload of this version
+    st, b = api("GET", f"/v1/builds?filter[app]={APP}&filter[version]={BUILD}&sort=-uploadedDate&limit=1")
     recs = b.get("data", [])
     if recs and recs[0]["attributes"]["processingState"] == "VALID":
         build_id = recs[0]["id"]; break
@@ -134,4 +153,12 @@ assert state == "IN_BETA_TESTING", f"unexpected state {state}"
 print(f"   ✓ build {BUILD} is IN_BETA_TESTING — TestFlight will notify the phone")
 PYEOF
 
-echo "══ DONE: 1.0 ($BUILD_NUM) shipped and assigned. Remember: commit the version bump."
+# Build is safely uploaded + assigned — the bump is now real, not to be restored.
+RESTORE_PBXPROJ=0
+echo "══ Committing the version bump"
+git add "$PBXPROJ"
+git commit -q -m "Build $BUILD_NUM" && git push -q origin main \
+	&& echo "   committed + pushed the build $BUILD_NUM bump" \
+	|| echo "   WARN: could not auto-commit/push the bump — commit $PBXPROJ manually."
+
+echo "══ DONE: 1.0 ($BUILD_NUM) shipped, assigned, and the bump is committed."
