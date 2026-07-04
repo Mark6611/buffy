@@ -261,9 +261,10 @@ export async function writeWidgetSnapshot(snapshot: {
 
 // ─────────────────────────────────────────────────────────────── Apple Health
 interface HealthBridge {
+	readBodyWeight(): Promise<{ kg?: number }>;
 	isAvailable(): Promise<{ available: boolean }>;
 	requestAuthorization(): Promise<{ granted: boolean }>;
-	writeWorkout(opts: { startTime: number; endTime: number }): Promise<void>;
+	writeWorkout(opts: { startTime: number; endTime: number; kcal?: number }): Promise<void>;
 	requestReadAuthorization(): Promise<{ granted: boolean }>;
 	readRecoverySignals(): Promise<RecoverySignals>;
 	readHeartRateSamples(opts: { startTime: number; endTime: number }): Promise<{ samplesJson: string }>;
@@ -293,11 +294,12 @@ export async function requestHealthAuthorization(): Promise<boolean> {
 	}
 }
 
-/** Write a finished workout to Apple Health as strength training (native only). */
-export async function writeHealthWorkout(startMs: number, endMs: number): Promise<void> {
+/** Write a finished workout to Apple Health as strength training (native only).
+ *  `kcal` (when known) becomes the workout's active energy — closes the Move ring. */
+export async function writeHealthWorkout(startMs: number, endMs: number, kcal?: number): Promise<void> {
 	if (!isNative) return;
 	try {
-		await Health.writeWorkout({ startTime: startMs, endTime: endMs });
+		await Health.writeWorkout({ startTime: startMs, endTime: endMs, kcal });
 	} catch {
 		/* best-effort — permission may have been denied */
 	}
@@ -380,6 +382,17 @@ export async function cloudSyncIsAvailable(): Promise<boolean> {
 		return (await CloudSync.isAvailable()).available;
 	} catch {
 		return false;
+	}
+}
+
+/** Latest body weight in Health (any source), kg — or null. */
+export async function readLatestBodyWeightKg(): Promise<number | null> {
+	if (!isNative) return null;
+	try {
+		const { kg } = await Health.readBodyWeight();
+		return typeof kg === 'number' && kg > 0 ? kg : null;
+	} catch {
+		return null;
 	}
 }
 

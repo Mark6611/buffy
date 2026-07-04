@@ -38,6 +38,20 @@
 		settings.save({ writeToHealth: next });
 	}
 
+	function saveBirthYear(v: string) {
+		const n = parseInt(v, 10);
+		const y = new Date().getFullYear();
+		settings.save({ birthYear: Number.isFinite(n) && n > 1900 && n <= y ? n : undefined });
+	}
+	function saveBodyWeight(v: string) {
+		const n = parseFloat(v);
+		settings.save({ bodyWeightKg: Number.isFinite(n) && n > 0 ? n : undefined });
+	}
+	function setSex(sex: 'male' | 'female') {
+		// tapping the active chip clears it — profile stays fully optional
+		settings.save({ sex: s.sex === sex ? undefined : sex });
+	}
+
 	function saveMaxHr(v: string) {
 		const n = parseFloat(v);
 		// blank (or nonsense) clears the override back to the estimate
@@ -175,6 +189,40 @@
 			</div>
 
 			{#if isNative}
+				<div>
+					<div class="h-sec" style="margin-bottom:8px">Profile</div>
+					<div class="card">
+						<div class="row" style="justify-content:space-between">
+							<div><div style="font-weight:500">Sex</div><div class="txt-sm">for the heart-rate calorie formula</div></div>
+							<span style="display:inline-flex;gap:6px">
+								<button class="chip {s.sex === 'male' ? 'accent' : ''}" style="padding:5px 10px" onclick={() => setSex('male')}>male</button>
+								<button class="chip {s.sex === 'female' ? 'accent' : ''}" style="padding:5px 10px" onclick={() => setSex('female')}>female</button>
+							</span>
+						</div>
+						<div class="divider"></div>
+						<div class="row" style="justify-content:space-between">
+							<div style="font-weight:500">Birth year</div>
+							<input
+								class="inp"
+								type="number"
+								style="width:74px"
+								placeholder="1995"
+								value={s.birthYear ?? ''}
+								onchange={(e) => {
+									saveBirthYear(e.currentTarget.value);
+									e.currentTarget.value = String(s.birthYear ?? '');
+								}}
+							/>
+						</div>
+						<div class="divider"></div>
+						<div class="row" style="justify-content:space-between">
+							<div><div style="font-weight:500">Body weight <span class="txt-sm">kg</span></div><div class="txt-sm">blank uses your latest Health entry</div></div>
+							<input class="inp" type="number" step="0.5" style="width:74px" placeholder="auto" value={s.bodyWeightKg ?? ''} onchange={(e) => saveBodyWeight(e.currentTarget.value)} />
+						</div>
+					</div>
+					<div class="txt-sm" style="margin-top:8px;padding-inline:4px">Used only to estimate workout calories — stays on this device.</div>
+				</div>
+
 				<div>
 					<div class="h-sec" style="margin-bottom:8px">Apple Health</div>
 					<div class="card">

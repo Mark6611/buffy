@@ -49,6 +49,8 @@ export interface WhoopWorkout {
 	strain: number;
 	avgHr: number;
 	maxHr: number;
+	/** gross session energy, kJ */
+	kilojoule?: number;
 	sport?: string;
 }
 
@@ -337,7 +339,7 @@ class WhoopStore {
 						end: string;
 						sport_name?: string;
 						score_state?: string;
-						score?: { strain?: number; average_heart_rate?: number; max_heart_rate?: number };
+						score?: { strain?: number; average_heart_rate?: number; max_heart_rate?: number; kilojoule?: number };
 					}[];
 			  }
 			| null;
@@ -349,6 +351,7 @@ class WhoopStore {
 				strain: w.score!.strain!,
 				avgHr: w.score!.average_heart_rate ?? 0,
 				maxHr: w.score!.max_heart_rate ?? 0,
+				kilojoule: w.score!.kilojoule,
 				sport: w.sport_name
 			}));
 		return bestOverlap({ start: startISO, end: endISO }, scored);

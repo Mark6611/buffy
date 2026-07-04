@@ -1,12 +1,14 @@
-// Attach measured effort data to a finished session, from two independent
-// sources: heart-rate samples in Apple Health (→ Buffy's %HRR intensity) and
-// the matched Whoop workout via the official API (→ real Whoop strain).
+// Attach measured/estimated effort data to a finished session, from independent
+// sources: heart-rate samples in Apple Health (→ Buffy's %HRR intensity), the
+// matched Whoop workout via the official API (→ real Whoop strain + energy),
+// and a calorie estimate tiered over whatever of those exists (see $lib/calories).
 // Called best-effort right after finishing AND lazily when a session is viewed
 // later — wearables sync minutes-to-hours after the workout, so the finish-time
 // attempt legitimately finds nothing.
+import { estimateCalories } from '$lib/calories';
 import { getRepository } from '$lib/db';
-import { computeWorkoutIntensity } from '$lib/intensity';
-import { isNative, readWorkoutHeartRate } from '$lib/native';
+import { computeWorkoutIntensity, type HrSample } from '$lib/intensity';
+import { isNative, readWorkoutHeartRate, readLatestBodyWeightKg } from '$lib/native';
 import { recovery } from '$lib/stores/recovery.svelte';
 import { settings } from '$lib/stores/settings.svelte';
 import { whoop } from '$lib/stores/whoop.svelte';
@@ -30,14 +32,20 @@ export function captureSessionIntensity(session: WorkoutSession): Promise<Workou
 async function doCapture(session: WorkoutSession): Promise<WorkoutSession | null> {
 	try {
 		if (!isNative || !session.endedAt) return null;
-		if (session.intensity && session.whoop) return null;
+		// fully captured once calories reached the top tier — lower tiers keep the
+		// door open for upgrades (met→hr when HR lands, anything→whoop on a match)
+		if (session.intensity && session.whoop && session.calories?.method === 'whoop') return null;
 		await settings.load();
+		const durationSec = (Date.parse(session.endedAt) - Date.parse(session.startedAt)) / 1000;
 
-		// Source 1 — HR samples from Health → %HRR intensity summary.
+		// Source 1 — HR samples from Health → %HRR intensity summary. The stream is
+		// also a calorie input, so it's fetched whenever calories still need it.
+		let samples: HrSample[] = [];
 		let intensityPatch: WorkoutSession['intensity'] | null = null;
-		if (!session.intensity && settings.current.readRecoveryFromHealth) {
-			const samples = await readWorkoutHeartRate(Date.parse(session.startedAt), Date.parse(session.endedAt));
-			if (samples.length) {
+		const caloriesUpgradable = !session.calories || session.calories.method === 'met';
+		if ((!session.intensity || caloriesUpgradable) && settings.current.readRecoveryFromHealth) {
+			samples = await readWorkoutHeartRate(Date.parse(session.startedAt), Date.parse(session.endedAt));
+			if (samples.length && !session.intensity) {
 				await recovery.refresh(); // rate-limited — just makes restingHr likely-present
 				const wi = computeWorkoutIntensity({
 					samples,
@@ -52,10 +60,16 @@ async function doCapture(session: WorkoutSession): Promise<WorkoutSession | null
 		let whoopPatch: WorkoutSession['whoop'] | null = null;
 		if (!session.whoop && whoop.connected) {
 			const w = await whoop.workoutFor(session.startedAt, session.endedAt);
-			if (w) whoopPatch = { strain: w.strain, avgHr: w.avgHr, maxHr: w.maxHr };
+			if (w) {
+				whoopPatch = {
+					strain: w.strain,
+					avgHr: w.avgHr,
+					maxHr: w.maxHr,
+					kilojoule: w.kilojoule,
+					durationSec: Math.max(0, (Date.parse(w.end) - Date.parse(w.start)) / 1000) || undefined
+				};
+			}
 		}
-
-		if (!intensityPatch && !whoopPatch) return null;
 
 		// Re-read and patch ONLY the measured fields: the copy we were handed is
 		// seconds old by now (network round trips), and writing it back whole
@@ -74,6 +88,30 @@ async function doCapture(session: WorkoutSession): Promise<WorkoutSession | null
 			updated.whoop = whoopPatch;
 			changed = true;
 		}
+
+		// Source 3 — calories. Tiers are RANKED (whoop > hr > met) and an estimate
+		// only ever replaces a strictly lower-ranked one — monotonic, so numbers
+		// upgrade as better data lands (met→hr when the HR stream syncs, →whoop on
+		// a match) and never flip-flop between recomputes.
+		const RANK = { whoop: 3, hr: 2, met: 1 } as const;
+		if (!fresh.calories || fresh.calories.method !== 'whoop') {
+			const weightKg = settings.current.bodyWeightKg ?? (await readLatestBodyWeightKg()) ?? undefined;
+			const est = estimateCalories({
+				durationSec,
+				weightKg,
+				age: settings.current.birthYear ? new Date().getFullYear() - settings.current.birthYear : undefined,
+				sex: settings.current.sex,
+				whoopKilojoule: updated.whoop?.kilojoule,
+				whoopDurationSec: updated.whoop?.durationSec,
+				hrSamples: samples,
+				intensityScore: updated.intensity?.score ?? fresh.intensity?.score
+			});
+			if (est && (!fresh.calories || RANK[est.method] > RANK[fresh.calories.method])) {
+				updated.calories = est;
+				changed = true;
+			}
+		}
+
 		if (!changed) return null;
 		await repo.upsertSession(updated);
 		return updated;

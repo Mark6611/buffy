@@ -284,6 +284,29 @@ This was the gap you reported: the exercise-row swipe existed, but sets had no a
 at all. *Verified: 5 new store unit tests (rest-timer shifts/cancel on set removal, min-1
 guard, add-set targeting) + a real-gesture E2E test (7/7).*
 
+## Build 13 additions — workout calories
+
+Every finished workout now gets an **active-calorie estimate**, shown on its History card
+("~412 kcal") with its provenance labeled. Three tiers, best available wins:
+1. **measured by Whoop** — your matched Whoop workout's energy (their HR model), converted
+   to net active calories;
+2. **from heart rate** — the session's Health HR stream through the Keytel (2005) regression
+   with a resistance-training correction (needs sex + birth year in Settings → Profile);
+3. **estimated** — a MET-based floor from session duration × body weight × measured intensity.
+
+Setup (once): **Settings → Profile** — set **sex** and **birth year** (for the HR formula);
+body weight is read automatically from your latest Health entry (Whoop/scale), with a manual
+override field if you prefer. All of it stays on-device.
+
+If **Write workouts to Health** is on, the estimate rides the workout into Apple Health as
+active energy — your **Move ring closes** from lifting now (the permission sheet will ask
+once more, for energy). Honest numbers notes: consumer methods for lifting calories carry
+15–57% error in the literature — that's why the method label is always shown. Two more:
+the number written to Health is the estimate available ~8s after you finish (a later
+in-app upgrade, e.g. when Whoop syncs, improves Buffy's card but Health keeps its copy);
+and if the Whoop app ALSO writes workouts/calories to Health, the Move ring would count
+both — keep Whoop→Apple Health workout sync off, or Buffy's Health toggle off, not both on.
+
 ## Open questions for you
 - iCloud toggle in build 6: does it now show "unavailable" instead of crashing? (It should.)
 - Anything off in the Live Activity styling (color, layout, what it shows, button placement)?

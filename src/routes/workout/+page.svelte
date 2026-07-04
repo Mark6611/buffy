@@ -49,13 +49,25 @@
 			void autoBackup(); // native: snapshot all data to Documents after a logged workout
 			void refreshWidget();
 			if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
-			if (settings.current.writeToHealth) void writeHealthAfterFinish(id);
-
 			const repo = getRepository();
 			const saved = await repo.getSession(id);
-			// Best-effort HR-intensity capture; often a no-op right at finish because
-			// the wearable hasn't synced to Health yet — history view backfills later.
-			if (saved) void captureSessionIntensity(saved);
+			// Best-effort HR-intensity + calorie capture; often partial right at finish
+			// because the wearable hasn't synced to Health yet — history backfills later.
+			// The Health write follows the capture so the calorie estimate (when it
+			// already exists) rides on the workout record and closes the Move ring.
+			if (saved) {
+				// give the capture a short window to produce a calorie estimate for the
+				// Health record, but never let a slow network (Whoop fetch) delay or —
+				// if the app is backgrounded meanwhile — lose the Health write entirely
+				const capture = captureSessionIntensity(saved);
+				if (settings.current.writeToHealth) {
+					void Promise.race([capture, new Promise<null>((r) => setTimeout(() => r(null), 8000))]).then((updated) =>
+						writeHealthAfterFinish(id, (updated ?? saved).calories?.kcal)
+					);
+				}
+			} else if (settings.current.writeToHealth) {
+				void writeHealthAfterFinish(id);
+			}
 			if (!saved) {
 				triggerCloudSync();
 				goto(`/history/${id}`);
@@ -88,9 +100,9 @@
 		const [sessions, templates] = await Promise.all([repo.listSessions(), repo.listTemplates()]);
 		await syncWidget(sessions, templates);
 	}
-	async function writeHealthAfterFinish(id: string) {
+	async function writeHealthAfterFinish(id: string, kcal?: number) {
 		const s = await getRepository().getSession(id);
-		if (s?.endedAt) await writeHealthWorkout(Date.parse(s.startedAt), Date.parse(s.endedAt));
+		if (s?.endedAt) await writeHealthWorkout(Date.parse(s.startedAt), Date.parse(s.endedAt), kcal ?? s.calories?.kcal);
 	}
 	function finalizeSync() {
 		if (!syncPrompt) return; // a queued double-fire (button + backdrop) must sync/navigate once

@@ -17,7 +17,8 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 		CAPPluginMethod(name: "writeWorkout", returnType: CAPPluginReturnPromise),
 		CAPPluginMethod(name: "requestReadAuthorization", returnType: CAPPluginReturnPromise),
 		CAPPluginMethod(name: "readRecoverySignals", returnType: CAPPluginReturnPromise),
-		CAPPluginMethod(name: "readHeartRateSamples", returnType: CAPPluginReturnPromise)
+		CAPPluginMethod(name: "readHeartRateSamples", returnType: CAPPluginReturnPromise),
+		CAPPluginMethod(name: "readBodyWeight", returnType: CAPPluginReturnPromise)
 	]
 
 	private let store = HKHealthStore()
@@ -26,6 +27,7 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 	private let rhrType = HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!
 	private let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
 	private let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
+	private let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass)!
 
 	@objc func isAvailable(_ call: CAPPluginCall) {
 		call.resolve(["available": HKHealthStore.isHealthDataAvailable()])
@@ -36,7 +38,10 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 			call.resolve(["granted": false])
 			return
 		}
-		let toShare: Set<HKSampleType> = [HKObjectType.workoutType()]
+		let toShare: Set<HKSampleType> = [
+			HKObjectType.workoutType(),
+			HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
+		]
 		store.requestAuthorization(toShare: toShare, read: []) { success, error in
 			call.resolve(["granted": success, "error": error?.localizedDescription ?? NSNull()])
 		}
@@ -58,6 +63,8 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 			return
 		}
 
+		let kcal = call.getDouble("kcal")
+
 		// HKWorkoutBuilder — the HKWorkout(activityType:start:end:) initializer is
 		// deprecated as of iOS 17; the builder is the supported write path.
 		func save() {
@@ -69,25 +76,38 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 					call.reject(error?.localizedDescription ?? "Failed to begin workout collection")
 					return
 				}
-				builder.endCollection(withEnd: end) { ended, error in
-					guard ended else {
-						call.reject(error?.localizedDescription ?? "Failed to end workout collection")
-						return
-					}
-					builder.finishWorkout { workout, error in
-						if workout != nil {
-							call.resolve()
-						} else {
-							call.reject(error?.localizedDescription ?? "Failed to save workout")
+				func finish() {
+					builder.endCollection(withEnd: end) { ended, error in
+						guard ended else {
+							call.reject(error?.localizedDescription ?? "Failed to end workout collection")
+							return
+						}
+						builder.finishWorkout { workout, error in
+							if workout != nil {
+								call.resolve()
+							} else {
+								call.reject(error?.localizedDescription ?? "Failed to save workout")
+							}
 						}
 					}
+				}
+				// Estimated active energy rides on the workout so it closes the Move
+				// ring — Health derives the workout total from attached samples.
+				if let kcal, kcal > 0 {
+					let qty = HKQuantity(unit: .kilocalorie(), doubleValue: kcal)
+					let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
+					let sample = HKQuantitySample(type: type, quantity: qty, start: start, end: end)
+					builder.add([sample]) { _, _ in finish() } // energy is best-effort — never blocks the workout write
+				} else {
+					finish()
 				}
 			}
 		}
 
 		// requestAuthorization is safe to call again (no-op if already decided); this
 		// covers a fresh call.resolve() timing race with the very first toggle-on.
-		let toShare: Set<HKSampleType> = [HKObjectType.workoutType()]
+		// activeEnergyBurned share access rides the same sheet.
+		let toShare: Set<HKSampleType> = [HKObjectType.workoutType(), HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!]
 		store.requestAuthorization(toShare: toShare, read: []) { _, _ in
 			DispatchQueue.main.async { save() }
 		}
@@ -103,7 +123,7 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 			call.resolve(["granted": false])
 			return
 		}
-		let read: Set<HKObjectType> = [hrvType, rhrType, hrType, sleepType]
+		let read: Set<HKObjectType> = [hrvType, rhrType, hrType, sleepType, bodyMassType]
 		store.requestAuthorization(toShare: [], read: read) { success, error in
 			call.resolve(["granted": success, "error": error?.localizedDescription ?? NSNull()])
 		}
@@ -254,5 +274,37 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 			call.resolve(["samplesJson": encoded ?? "[]"])
 		}
 		store.execute(q)
+	}
+
+	/// Latest body-weight sample (any source — scale app, manual entry, Whoop).
+	/// Resolves { kg: number } or {} when Health has none. Every calorie formula
+	/// needs mass, so this saves the user typing a number the phone already knows.
+	/// Users who granted the read set before bodyMass joined it have never been
+	/// asked — getRequestStatusForAuthorization detects that (it works for read
+	/// sets, unlike authorizationStatus which only reflects sharing) and prompts
+	/// for just this type inline before querying.
+	@objc func readBodyWeight(_ call: CAPPluginCall) {
+		guard HKHealthStore.isHealthDataAvailable() else {
+			call.resolve([:])
+			return
+		}
+		func query() {
+			let sort = [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]
+			let q = HKSampleQuery(sampleType: bodyMassType, predicate: nil, limit: 1, sortDescriptors: sort) { _, samples, _ in
+				guard let sample = samples?.first as? HKQuantitySample else {
+					call.resolve([:])
+					return
+				}
+				call.resolve(["kg": sample.quantity.doubleValue(for: .gramUnit(with: .kilo))])
+			}
+			self.store.execute(q)
+		}
+		store.getRequestStatusForAuthorization(toShare: [], read: [bodyMassType]) { status, _ in
+			if status == .shouldRequest {
+				self.store.requestAuthorization(toShare: [], read: [self.bodyMassType]) { _, _ in query() }
+			} else {
+				query()
+			}
+		}
 	}
 }
