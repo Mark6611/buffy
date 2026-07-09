@@ -347,6 +347,11 @@
 						<div style="font-weight:500">Export data</div>
 						<Icon name="share" size={18} color="var(--ink-3)" />
 					</button>
+					<div class="divider"></div>
+					<a class="row" href="/privacy" style="justify-content:space-between;width:100%;text-decoration:none;color:inherit">
+						<div style="font-weight:500">Privacy Policy</div>
+						<Icon name="chevR" size={16} color="var(--ink-3)" />
+					</a>
 				</div>
 			</div>
 		</div>

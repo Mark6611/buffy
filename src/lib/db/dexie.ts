@@ -4,6 +4,7 @@ import Dexie, { type Table } from 'dexie';
 import type { Exercise, Template, WorkoutSession, Settings, ID } from '$lib/types';
 import type { Repository } from './repository';
 import { DEFAULT_SETTINGS } from './seed';
+import { stripSessionHealth, preserveLocalHealth } from '$lib/healthPrivacy';
 
 type SettingsRow = Settings & { id: string };
 const SETTINGS_KEY = 'singleton';
@@ -145,8 +146,9 @@ export class DexieRepository implements Repository {
 	listTemplatesForSync() {
 		return this.db.templates.toArray();
 	}
-	listSessionsForSync() {
-		return this.db.sessions.toArray();
+	async listSessionsForSync() {
+		// health-derived fields must not leave the device for iCloud (5.1.3(ii))
+		return (await this.db.sessions.toArray()).map(stripSessionHealth);
 	}
 
 	// Write the pulled record only if it is strictly newer than what's stored NOW —
@@ -167,6 +169,13 @@ export class DexieRepository implements Repository {
 		await this.applyIfNewer(this.db.templates, t);
 	}
 	async applySyncedSession(s: WorkoutSession) {
-		await this.applyIfNewer(this.db.sessions, s);
+		// like applyIfNewer, but preserves this device's local health fields — health
+		// never rides sync in either direction (5.1.3(ii)); it's recomputed locally.
+		await this.db.transaction('rw', this.db.sessions, async () => {
+			const cur = await this.db.sessions.get(s.id);
+			const curTime = cur?.updatedAt ? Date.parse(cur.updatedAt) : -Infinity;
+			const recTime = s.updatedAt ? Date.parse(s.updatedAt) : -Infinity;
+			if (!cur || recTime > curTime) await this.db.sessions.put(preserveLocalHealth(s, cur));
+		});
 	}
 }
