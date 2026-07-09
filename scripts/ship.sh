@@ -62,18 +62,38 @@ echo "══ Gate 3/3: E2E"
 npm run test:e2e
 
 echo "══ Version bump"
+# The authoritative highest build number is on App Store Connect — the local
+# pbxproj can lag behind it (e.g. a build shipped by an older path never committed
+# its bump), and current+1 off a stale local number produces a DUPLICATE-version
+# upload rejection. So the next number is max(local, ASC-latest) + 1 unless an
+# explicit number was requested.
+ASC_MAX=$(python3 - <<'PY' 2>/dev/null || echo 0
+import jwt, time, json, urllib.request, os
+KEY_ID, ISSUER = "DUPV266J6S", "b0021702-5324-4cc1-9ddd-66a5a1535fe6"
+KEY = open(f"{os.path.expanduser('~')}/.appstoreconnect/private_keys/AuthKey_{KEY_ID}.p8").read()
+now = int(time.time())
+tok = jwt.encode({"iss": ISSUER, "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"}, KEY, algorithm="ES256", headers={"kid": KEY_ID, "typ": "JWT"})
+req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/builds?filter[app]=6785999682&sort=-uploadedDate&limit=50")
+req.add_header("Authorization", "Bearer " + tok)
+d = json.load(urllib.request.urlopen(req))
+nums = [int(b["attributes"]["version"]) for b in d.get("data", []) if str(b["attributes"]["version"]).isdigit()]
+print(max(nums) if nums else 0)
+PY
+)
+echo "   highest build on App Store Connect: ${ASC_MAX:-unknown}"
 BUILD_NUM=$(ruby -e '
 require "xcodeproj"
 proj = Xcodeproj::Project.open("ios/App/App.xcodeproj")
 app = proj.targets.find { |t| t.name == "App" }
 current = app.build_configurations.first.build_settings["CURRENT_PROJECT_VERSION"].to_i
-n = ARGV[0].to_s.empty? ? current + 1 : ARGV[0].to_i
+asc_max = ARGV[1].to_i
+n = ARGV[0].to_s.empty? ? [current, asc_max].max + 1 : ARGV[0].to_i
 proj.targets.each do |t|
   next unless ["App", "RestWidget"].include?(t.name)
   t.build_configurations.each { |c| c.build_settings["CURRENT_PROJECT_VERSION"] = n.to_s }
 end
 proj.save
-puts n' "$BUILD_NUM")
+puts n' "$BUILD_NUM" "$ASC_MAX")
 echo "   building 1.0 ($BUILD_NUM)"
 
 echo "══ Web bundle + native sync"
