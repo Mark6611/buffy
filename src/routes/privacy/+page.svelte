@@ -3,7 +3,7 @@
 	// an in-app link) and 5.1.3 (health apps must name the specific health data).
 	// Reachable at buffy-six.vercel.app/privacy and from Settings inside the app.
 	const updated = 'July 2026';
-	const CONTACT = '<your-support-email>'; // ← fill in before submitting
+	const CONTACT = 'kornkranmarwin@gmail.com';
 </script>
 
 <svelte:head><title>Buffy — Privacy Policy</title></svelte:head>
@@ -67,7 +67,7 @@
 	<p>Buffy is not directed at children and does not knowingly collect data from children.</p>
 
 	<h2>Contact</h2>
-	<p>Questions about this policy or your data: {CONTACT}</p>
+	<p>Questions about this policy or your data: <a href="mailto:{CONTACT}">{CONTACT}</a></p>
 </article>
 
 <style>
