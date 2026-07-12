@@ -167,7 +167,10 @@ test('a set row can be added and swipe-deleted mid-workout', async ({ page }) =>
 });
 
 test('exercises can be reordered from the swipe actions', async ({ page }) => {
-	await page.getByRole('button', { name: /Shoulder Core/ }).first().click();
+	// Use "Legs" — a superset-free template — so blocks map 1:1 to exercises and a
+	// Move-down is an exact adjacent swap. (Moving past a superset correctly jumps the
+	// whole group, so a grouped template can't assert a simple positional swap.)
+	await page.getByRole('button', { name: /Legs/ }).first().click();
 	await page.getByRole('button', { name: 'Start', exact: true }).click();
 	await expect(page).toHaveURL(/\/workout/);
 
