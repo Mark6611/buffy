@@ -7,6 +7,7 @@ export interface Suggestion {
 	last: string;
 	nextWeight?: number;
 	nextReps?: number;
+	nextDurationSec?: number;
 	stepLabel: string;
 	hit: boolean;
 	/** True when reps were hit but we held the load anyway because recovery is low. */
@@ -54,6 +55,7 @@ export function computeSuggestion(
 		const advance = hit && !strained;
 		return {
 			last: `${m}:${String(r).padStart(2, '0')} hold`,
+			nextDurationSec: advance ? lastDur + 5 : lastDur,
 			stepLabel: advance ? '+5s' : held ? 'hold (recovery)' : 'hold',
 			hit,
 			heldForRecovery: held

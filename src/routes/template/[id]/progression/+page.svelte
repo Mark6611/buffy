@@ -54,7 +54,7 @@
 			</div>
 
 			<div style="display:flex;flex-direction:column;gap:10px">
-				{#each rows as r (r.ex.id)}
+				{#each rows as r, i (r.ex.id + ':' + i)}
 					<div class="card card-pad">
 						<div style="display:flex;align-items:center;gap:11px">
 							<Thumb equip={r.ex.equipment} size="sm" />

@@ -102,13 +102,13 @@
 				<div class="h-sec" style="margin-bottom:12px">Exercises · {tpl.exercises.length}</div>
 
 				<div style="display:flex;flex-direction:column;gap:10px">
-					{#each items as item (item.type === 'single' ? item.te.exerciseId : item.members[0].exerciseId)}
+					{#each items as item, i (item.type === 'single' ? item.te.exerciseId + ':' + i : item.members[0].exerciseId + ':' + i)}
 						{#if item.type === 'single'}
 							{@render exRow(item.te)}
 						{:else}
 							<div class="superset">
 								<span class="superset-tag"><Icon name="link" size={12} color="#fff" sw={2.2} />Superset</span>
-								{#each item.members as m (m.exerciseId)}
+								{#each item.members as m, mi (m.exerciseId + ':' + mi)}
 									<div class="ss-member">{@render exRow(m, true)}</div>
 								{/each}
 								<div class="ss-rest">

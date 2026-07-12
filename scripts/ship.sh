@@ -58,8 +58,10 @@ echo "══ Gate 1/3: unit tests"
 npm test
 echo "══ Gate 2/3: svelte-check"
 npm run check
-echo "══ Gate 3/3: E2E"
-npm run test:e2e
+echo "══ Gate 3/3: E2E (against a fresh PRODUCTION build, never a stale dev server)"
+# CI=1 makes Playwright build+preview a fresh server (reuseExistingServer:false) instead
+# of validating whatever dev server happened to be left listening on :4173.
+CI=1 npm run test:e2e
 
 echo "══ Version bump"
 # The authoritative highest build number is on App Store Connect — the local

@@ -21,9 +21,21 @@ class EditorStore {
 	meta = $state<Record<string, Exercise>>({});
 	selection = $state<Set<number>>(new Set());
 	private loadedFor: string | null = null;
+	/**
+	 * Set true ONLY right before navigating to the picker (see the edit page), so the
+	 * in-progress draft survives that one round-trip. Every other re-entry into the
+	 * editor rebuilds from the DB (or fresh for 'new') — otherwise the singleton draft
+	 * persists after save/abandon and the next "New" reopens (and Save overwrites) the
+	 * previous template instead of creating a second one.
+	 */
+	keepDraft = false;
 
 	async load(id: string) {
-		if (this.draft && this.loadedFor === id) return; // keep draft across picker round-trips
+		if (this.draft && this.loadedFor === id && this.keepDraft) {
+			this.keepDraft = false;
+			return; // returning from the picker — keep the in-progress draft
+		}
+		this.keepDraft = false;
 		const repo = getRepository();
 		const exAll = await repo.listExercises();
 		this.meta = Object.fromEntries(exAll.map((e) => [e.id, e]));

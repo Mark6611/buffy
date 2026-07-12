@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { mmss, parseMmss, kg, volK, durationLabel, relativeDay, hhmm, equipLabel } from '$lib/format';
+import { mmss, parseMmss, kg, volK, durationLabel, relativeDay, hhmm, equipLabel, hoursMinutes } from '$lib/format';
+
+describe('hoursMinutes', () => {
+	it('formats H:MM and carries rounded minutes into the hour', () => {
+		expect(hoursMinutes(0)).toBe('0:00');
+		expect(hoursMinutes(3600)).toBe('1:00');
+		expect(hoursMinutes(3660)).toBe('1:01');
+		// the "1:60" bug: 1h59m30s must round UP to 2:00, never 1:60
+		expect(hoursMinutes(7170)).toBe('2:00');
+		expect(hoursMinutes(3585)).toBe('1:00');
+	});
+});
 
 describe('mmss', () => {
 	it('formats seconds', () => {

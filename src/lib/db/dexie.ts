@@ -64,8 +64,21 @@ export class DexieRepository implements Repository {
 	) {
 		const rec = await table.get(id);
 		if (!rec || rec.deletedAt) return;
-		const now = new Date().toISOString();
+		const now = this.monotonicStamp(rec.updatedAt);
 		await table.put({ ...rec, deletedAt: now, updatedAt: now });
+	}
+	// LWW's merge key is device wall-clock time; a skewed/rewound clock would stamp an
+	// edit OLDER than the record it replaces and then lose the merge against a stale
+	// remote copy. Clamp every write forward of the record's own last stamp so a
+	// device's successive edits are always monotonically increasing.
+	private monotonicStamp(prevUpdatedAt?: string): string {
+		const prevMs = prevUpdatedAt ? Date.parse(prevUpdatedAt) : 0;
+		const now = Date.now();
+		return new Date(now > prevMs ? now : prevMs + 1).toISOString();
+	}
+	private async stampFor<T extends { updatedAt?: string }>(table: Table<T, ID>, id: ID): Promise<string> {
+		const prev = await table.get(id);
+		return this.monotonicStamp(prev?.updatedAt);
 	}
 	private live<T extends { deletedAt?: string }>(rows: T[]) {
 		return rows.filter((r) => !r.deletedAt);
@@ -82,7 +95,7 @@ export class DexieRepository implements Repository {
 	async upsertExercise(ex: Exercise) {
 		// stamp centrally — sync merge depends on every write bumping this, and
 		// there are too many call sites to trust each one to remember
-		await this.db.exercises.put({ ...ex, updatedAt: new Date().toISOString() });
+		await this.db.exercises.put({ ...ex, updatedAt: await this.stampFor(this.db.exercises, ex.id) });
 	}
 	async deleteExercise(id: ID) {
 		await this.tombstone(this.db.exercises, id);
@@ -97,7 +110,7 @@ export class DexieRepository implements Repository {
 		return t?.deletedAt ? undefined : t;
 	}
 	async upsertTemplate(t: Template) {
-		await this.db.templates.put({ ...t, updatedAt: new Date().toISOString() });
+		await this.db.templates.put({ ...t, updatedAt: await this.stampFor(this.db.templates, t.id) });
 	}
 	async deleteTemplate(id: ID) {
 		await this.tombstone(this.db.templates, id);
@@ -112,10 +125,24 @@ export class DexieRepository implements Repository {
 		return s?.deletedAt ? undefined : s;
 	}
 	async upsertSession(s: WorkoutSession) {
-		await this.db.sessions.put({ ...s, updatedAt: new Date().toISOString() });
+		await this.db.sessions.put({ ...s, updatedAt: await this.stampFor(this.db.sessions, s.id) });
 	}
 	async deleteSession(id: ID) {
 		await this.tombstone(this.db.sessions, id);
+	}
+	// Health-only patch: atomic re-read + write in ONE transaction (so a remote record
+	// applied mid-capture can't be clobbered), and deliberately NOT through upsertSession
+	// so updatedAt is preserved — health data never rides sync, so it must not move the
+	// LWW clock. See the interface doc.
+	async patchSessionHealth(id: ID, patch: (fresh: WorkoutSession) => WorkoutSession | null) {
+		return this.db.transaction('rw', this.db.sessions, async () => {
+			const fresh = await this.db.sessions.get(id);
+			if (!fresh || fresh.deletedAt) return null;
+			const updated = patch(fresh);
+			if (!updated) return null;
+			await this.db.sessions.put(updated);
+			return updated;
+		});
 	}
 	async lastSessionForExercise(exerciseId: ID) {
 		const all = await this.db.sessions.orderBy('startedAt').reverse().toArray();

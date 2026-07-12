@@ -106,7 +106,7 @@
 					{/each}
 				</div>
 
-				<button class="btn btn-ghost btn-block" style="margin-top:14px" onclick={() => goto('/picker?to=tpl')}>
+				<button class="btn btn-ghost btn-block" style="margin-top:14px" onclick={() => { editor.keepDraft = true; goto('/picker?to=tpl'); }}>
 					<Icon name="plus" size={18} />Add exercise
 				</button>
 			</div>

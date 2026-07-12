@@ -33,6 +33,19 @@ export interface Repository {
 	getSession(id: ID): Promise<WorkoutSession | undefined>;
 	upsertSession(s: WorkoutSession): Promise<void>;
 	deleteSession(id: ID): Promise<void>;
+	/**
+	 * Patch ONLY device-local health fields (intensity/whoop/calories) atomically,
+	 * WITHOUT bumping updatedAt. Those fields are stripped from iCloud sync, so a
+	 * health recompute must not move the last-write-wins clock — otherwise this
+	 * (possibly stale) local copy would win LWW and erase another device's real edit.
+	 * `patch` runs inside a transaction on the freshly-read record; return the record
+	 * to write, or null for a no-op. Resolves any async inputs (e.g. body weight)
+	 * BEFORE calling — the callback must be synchronous. Returns the written record or null.
+	 */
+	patchSessionHealth(
+		id: ID,
+		patch: (fresh: WorkoutSession) => WorkoutSession | null
+	): Promise<WorkoutSession | null>;
 	/** most recent session that logged this exercise — powers auto-progression "last time" anchors */
 	lastSessionForExercise(exerciseId: ID): Promise<WorkoutSession | undefined>;
 

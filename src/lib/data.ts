@@ -99,7 +99,19 @@ export function parseBackup(text: string): BuffyBackup {
 		throw new Error('That file isn’t valid JSON.');
 	}
 	const b = data as BuffyBackup;
-	if (!b || b.app !== 'buffy' || !Array.isArray(b.sessions) || !Array.isArray(b.exercises)) {
+	// Validate shapes BEFORE any caller wipes the DB (replace-mode import calls
+	// clearAll first): every record must have a string id, and templates — if present
+	// — must be an array. A truthy non-array `templates` used to pass and then throw
+	// `not iterable` AFTER clearAll had already erased everything.
+	const isRecordArray = (v: unknown): boolean =>
+		Array.isArray(v) && v.every((r) => !!r && typeof (r as { id?: unknown }).id === 'string');
+	if (
+		!b ||
+		b.app !== 'buffy' ||
+		!isRecordArray(b.sessions) ||
+		!isRecordArray(b.exercises) ||
+		(b.templates !== undefined && !isRecordArray(b.templates))
+	) {
 		throw new Error('That doesn’t look like a Buffy backup.');
 	}
 	return b;
@@ -115,7 +127,15 @@ export async function importBackup(b: BuffyBackup, mode: ImportMode): Promise<Im
 	const repo = getRepository();
 	if (mode === 'replace') await repo.clearAll();
 
-	const [exEx, exTp, exSe] = await Promise.all([repo.listExercises(), repo.listTemplates(), repo.listSessions()]);
+	// Dedupe against the RAW tables (tombstones included), not the live lists — a
+	// record the user has since deleted must count as "already present" so a merge
+	// import doesn't re-upsert it, resurrect the deletion, and re-propagate it to every
+	// synced device.
+	const [exEx, exTp, exSe] = await Promise.all([
+		repo.listExercisesForSync(),
+		repo.listTemplatesForSync(),
+		repo.listSessionsForSync()
+	]);
 	const exIds = new Set(exEx.map((e) => e.id));
 	const tpIds = new Set(exTp.map((t) => t.id));
 	const seIds = new Set(exSe.map((s) => s.id));

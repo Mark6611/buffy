@@ -26,15 +26,17 @@
 		lastAuto = localStorage.getItem('buffy:lastAutoBackup');
 	}
 
-	async function doExportJSON() {
+	async function doExportJSON(): Promise<boolean> {
 		try {
 			await exportJSON();
 			const now = new Date().toISOString();
 			localStorage.setItem('buffy:lastBackup', now);
 			lastBackup = now;
 			message = 'Backup exported.';
+			return true;
 		} catch (e) {
 			message = e instanceof Error ? e.message : 'Export failed.';
+			return false;
 		}
 	}
 
@@ -66,10 +68,15 @@
 		}
 		if (mode === 'merge') {
 			busy = true;
-			const r = await importBackup(backup, 'merge');
-			busy = false;
-			message = `Merged — added ${r.sessions} sessions, ${r.templates} templates, ${r.exercises} exercises.`;
-			await refresh();
+			try {
+				const r = await importBackup(backup, 'merge');
+				message = `Merged — added ${r.sessions} sessions, ${r.templates} templates, ${r.exercises} exercises.`;
+				await refresh();
+			} catch (err) {
+				message = err instanceof Error ? `Import failed — ${err.message}` : 'Import failed.';
+			} finally {
+				busy = false;
+			}
 		} else {
 			pending = { backup, name: file.name };
 		}
@@ -77,12 +84,24 @@
 	async function confirmReplace() {
 		if (!pending) return;
 		busy = true;
-		if (exportFirst) await doExportJSON();
-		const r = await importBackup(pending.backup, 'replace');
-		pending = null;
-		busy = false;
-		message = `Replaced — loaded ${r.sessions} sessions, ${r.templates} templates.`;
-		await refresh();
+		try {
+			// If the safety backup was requested, it MUST succeed before we wipe —
+			// doExportJSON swallows its own errors, so gate the destructive step on
+			// its return value instead of blindly proceeding.
+			if (exportFirst && !(await doExportJSON())) {
+				message = 'Stopped — the safety backup failed, so nothing was changed. Uncheck it or fix storage, then retry.';
+				return;
+			}
+			const r = await importBackup(pending.backup, 'replace');
+			pending = null;
+			message = `Replaced — loaded ${r.sessions} sessions, ${r.templates} templates.`;
+			await refresh();
+		} catch (err) {
+			message = err instanceof Error ? `Import failed — ${err.message}` : 'Import failed.';
+			await refresh();
+		} finally {
+			busy = false;
+		}
 	}
 </script>
 

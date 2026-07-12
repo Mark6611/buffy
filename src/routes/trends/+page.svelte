@@ -11,7 +11,7 @@
 		recentPRs,
 		type TrendWindow
 	} from '$lib/analytics';
-	import { volK } from '$lib/format';
+	import { volK, hoursMinutes } from '$lib/format';
 	import { HEAT } from '$lib/charts';
 	import type { WorkoutSession, Exercise } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
@@ -48,9 +48,6 @@
 	const prs = $derived(recentPRs(sessions, byId));
 	const low = $derived(muscles.find((m) => m.low));
 
-	function timeLabel(sec: number): string {
-		return `${Math.floor(sec / 3600)}:${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`;
-	}
 	const sessDelta = $derived(
 		k.sessionsDelta === 0 ? 'same' : k.sessionsDelta > 0 ? `+${k.sessionsDelta}` : `${k.sessionsDelta}`
 	);
@@ -101,7 +98,7 @@
 					<StatCard icon="cal" big={String(k.sessionsThisWeek)} label="Sessions / wk" delta={sessDelta} deltaUp={k.sessionsDelta >= 0} />
 					<StatCard
 						icon="clock"
-						big={timeLabel(k.timeThisWeekSec)}
+						big={hoursMinutes(k.timeThisWeekSec)}
 						label="Time this wk"
 						delta={k.timeDeltaPct == null ? undefined : `${Math.abs(k.timeDeltaPct)}%`}
 						deltaUp={(k.timeDeltaPct ?? 0) >= 0}

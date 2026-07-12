@@ -203,6 +203,7 @@ class WorkoutStore {
 				le.sets.forEach((set) => {
 					if (sg.nextWeight != null) set.weight = sg.nextWeight;
 					if (sg.nextReps != null) set.reps = sg.nextReps;
+					if (sg.nextDurationSec != null) set.durationSec = sg.nextDurationSec;
 				});
 			});
 		}
@@ -490,6 +491,20 @@ class WorkoutStore {
 		if (!set) return;
 		if (set.completed) {
 			set.completed = false;
+			// If we were resting "for" this set, stop the timer — otherwise the active
+			// pointer goes stale and the next completed set's rest gets attributed to
+			// this now-incomplete set and then dropped at finish().
+			if (this.restForSet && this.restForSet.ex === exIndex && this.restForSet.set === setIndex) {
+				cancelRestEndAlert();
+				this.restRunning = false;
+				this.restAccumSec = 0;
+				this.restStartedAtMs = 0;
+				this.restSeedSec = 0;
+				this.restForSet = null;
+				this.restHapticFired = false;
+			}
+			this.setActiveToFirstIncomplete();
+			this.restLiveSync();
 			return;
 		}
 		set.completed = true;
@@ -592,7 +607,23 @@ class WorkoutStore {
 	private applyExternalRestAdjustment(adj: { endTimeMs: number; skipped: boolean }) {
 		if (!this.restForSet) return;
 		if (adj.skipped) {
-			this.skipRest();
+			// Stamp the rest that had elapsed AT THE TAP (adj.endTimeMs recorded by the
+			// Skip intent), not at reconcile time — skipRest() reads the live wall-clock
+			// elapsed, which includes every minute the app stayed backgrounded after the
+			// tap and inflates the previous set's recorded rest.
+			const prev = this.session?.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
+			if (prev) {
+				const elapsedAtTap = this.restAccumSec + Math.max(0, (adj.endTimeMs - this.restStartedAtMs) / 1000);
+				prev.restTakenSec = Math.max(0, Math.round(elapsedAtTap));
+			}
+			cancelRestEndAlert();
+			this.restRunning = false;
+			this.restAccumSec = 0;
+			this.restStartedAtMs = 0;
+			this.restSeedSec = 0;
+			this.restForSet = null;
+			this.restHapticFired = false;
+			this.restLiveSync();
 			return;
 		}
 		const remainingSec = (adj.endTimeMs - Date.now()) / 1000;
@@ -647,22 +678,27 @@ class WorkoutStore {
 	async finish(): Promise<string | null> {
 		const s = this.session;
 		if (!s) return null;
+		// Build the finished record on a SNAPSHOT — never mutate the live $state session
+		// before the await. If upsert throws (storage full / WebKit eviction), the
+		// in-progress workout and its localStorage resume snapshot must stay intact and
+		// resumable rather than being left pruned and misaligned with meta/plannedRest.
+		const out = $state.snapshot(s) as WorkoutSession;
 		// fold the final running rest into its set
 		if (this.restForSet) {
-			const prev = s.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
+			const prev = out.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
 			if (prev) prev.restTakenSec = Math.max(0, Math.round(this.restElapsedSec));
 		}
-		s.endedAt = new Date().toISOString();
+		out.endedAt = new Date().toISOString();
 		// keep only completed sets (drop prefilled-but-unchecked ones), then drop empty exercises
-		s.exercises = s.exercises
+		out.exercises = out.exercises
 			.map((e) => ({ ...e, sets: e.sets.filter((x) => x.completed) }))
 			.filter((e) => e.sets.length > 0);
-		if (s.exercises.length === 0) {
+		if (out.exercises.length === 0) {
 			this.cancel();
 			return null; // nothing logged — don't save an empty session
 		}
-		await getRepository().upsertSession($state.snapshot(s));
-		const id = s.id;
+		await getRepository().upsertSession(out);
+		const id = out.id;
 		this.cancel();
 		return id;
 	}

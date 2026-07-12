@@ -71,6 +71,7 @@ describe('computeSuggestion', () => {
 		);
 		expect(sg?.stepLabel).toBe('+5s');
 		expect(sg?.last).toBe('0:45 hold');
+		expect(sg?.nextDurationSec).toBe(50);
 	});
 	it('time-hold target hit → +5s', () => {
 		const sg = computeSuggestion(
@@ -79,14 +80,16 @@ describe('computeSuggestion', () => {
 		);
 		expect(sg?.hit).toBe(true);
 		expect(sg?.stepLabel).toBe('+5s');
+		expect(sg?.nextDurationSec).toBe(50);
 	});
-	it('time-hold target missed → hold', () => {
+	it('time-hold target missed → hold, keeps duration', () => {
 		const sg = computeSuggestion(
 			exercise({ id: 'pl', trackingType: 'time_hold', loadType: 'bodyweight', defaultTargetDurationSec: 60 }),
 			session('pl', [set({ durationSec: 30 })])
 		);
 		expect(sg?.hit).toBe(false);
 		expect(sg?.stepLabel).toBe('hold');
+		expect(sg?.nextDurationSec).toBe(30);
 		expect(sg?.heldForRecovery).toBe(false);
 		expect(sg?.last).toBe('0:30 hold');
 	});

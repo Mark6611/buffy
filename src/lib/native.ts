@@ -130,16 +130,34 @@ export async function cancelRestEndAlert(): Promise<void> {
 // when the page hides, so it must be re-acquired on return to the foreground.
 let wakeLock: { release: () => Promise<void> } | null = null;
 let wantWake = false;
+let wakeReq: Promise<{ release: () => Promise<void> } | null> | null = null; // single-flight guard
 
 /** Keep the screen on (call when a workout becomes active). */
 export async function keepAwake(): Promise<void> {
 	wantWake = true;
 	try {
 		const nav = navigator as unknown as { wakeLock?: { request: (t: string) => Promise<typeof wakeLock> } };
-		if (nav.wakeLock && document.visibilityState === 'visible' && !wakeLock) {
-			wakeLock = await nav.wakeLock.request('screen');
+		// single-flight: a second call while a request is in flight must not fire another
+		// (the first sentinel would be orphaned, held forever)
+		if (nav.wakeLock && document.visibilityState === 'visible' && !wakeLock && !wakeReq) {
+			wakeReq = nav.wakeLock.request('screen');
+			const sentinel = await wakeReq;
+			wakeReq = null;
+			// allowSleep() may have run while the request was in flight (workout ended).
+			// Don't leak the just-acquired lock — release it and stay released.
+			if (!wantWake) {
+				try {
+					await sentinel?.release();
+				} catch {
+					/* ignore */
+				}
+				wakeLock = null;
+			} else {
+				wakeLock = sentinel;
+			}
 		}
 	} catch {
+		wakeReq = null;
 		/* unavailable / denied */
 	}
 }

@@ -201,17 +201,26 @@ function buildSessions(now: number, templates: Template[], exById: Map<string, E
 	return sessions;
 }
 
-// ---- Entry point ------------------------------------------------------------
+// Every seed record shares this fixed, ancient updatedAt so that ANY genuine user
+// action — always stamped `now` — beats it in last-write-wins, on both push and pull.
+// Without this, a fresh install's seed (deterministic ids + updatedAt=now) would be
+// "newer" than the same ids already in a user's iCloud from their first device, and
+// would clobber real edits / resurrect deleted demo history on every device migration
+// or reinstall. Written through applySynced* (the only path that preserves a caller's
+// updatedAt); on the empty DB the seed runs against, those always write.
+const SEED_EPOCH = '2000-01-01T00:00:00.000Z';
+
 export async function seedDatabase(repo: Repository): Promise<void> {
 	const existing = await repo.listExercises();
 	if (existing.length > 0) return; // already seeded
 
-	for (const e of EXERCISES) await repo.upsertExercise(e);
+	for (const e of EXERCISES) await repo.applySyncedExercise({ ...e, updatedAt: SEED_EPOCH });
 
 	const now = Date.now();
 	const iso = new Date(now).toISOString();
 	const templates = buildTemplates(iso);
-	for (const t of templates) await repo.upsertTemplate(t);
+	for (const t of templates) await repo.applySyncedTemplate({ ...t, updatedAt: SEED_EPOCH });
 
-	for (const s of buildSessions(now, templates, new Map(EXERCISES.map((e) => [e.id, e])))) await repo.upsertSession(s);
+	for (const s of buildSessions(now, templates, new Map(EXERCISES.map((e) => [e.id, e]))))
+		await repo.applySyncedSession({ ...s, updatedAt: SEED_EPOCH });
 }

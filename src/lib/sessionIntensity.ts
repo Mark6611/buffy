@@ -71,50 +71,56 @@ async function doCapture(session: WorkoutSession): Promise<WorkoutSession | null
 			}
 		}
 
-		// Re-read and patch ONLY the measured fields: the copy we were handed is
-		// seconds old by now (network round trips), and writing it back whole
-		// would clobber anything saved meanwhile — e.g. a note typed while the
-		// history page's backfill was in flight.
-		const repo = getRepository();
-		const fresh = await repo.getSession(session.id);
-		if (!fresh) return null;
-		const updated: WorkoutSession = { ...fresh };
-		let changed = false;
-		if (intensityPatch && !fresh.intensity) {
-			updated.intensity = intensityPatch;
-			changed = true;
-		}
-		if (whoopPatch && !fresh.whoop) {
-			updated.whoop = whoopPatch;
-			changed = true;
-		}
+		// Body weight is a native round trip → resolve it BEFORE the write so the
+		// re-read-and-patch below is a single atomic transaction with no awaits inside.
+		const weightKg =
+			(!session.calories || session.calories.method !== 'whoop')
+				? settings.current.bodyWeightKg ?? (await readLatestBodyWeightKg()) ?? undefined
+				: undefined;
+		const age = settings.current.birthYear ? new Date().getFullYear() - settings.current.birthYear : undefined;
+		const sex = settings.current.sex;
 
-		// Source 3 — calories. Tiers are RANKED (whoop > hr > met) and an estimate
-		// only ever replaces a strictly lower-ranked one — monotonic, so numbers
-		// upgrade as better data lands (met→hr when the HR stream syncs, →whoop on
-		// a match) and never flip-flop between recomputes.
+		// Re-read and patch ONLY the measured fields, atomically. The copy we were
+		// handed is seconds old (network round trips); re-reading inside the write's
+		// transaction stops a note (or a record applied by a sync pass) landing in
+		// that window from being clobbered. patchSessionHealth deliberately does NOT
+		// bump updatedAt — health fields don't sync, so a health-only write must not
+		// move the last-write-wins clock (else this stale copy could win and erase a
+		// real edit on another device).
 		const RANK = { whoop: 3, hr: 2, met: 1 } as const;
-		if (!fresh.calories || fresh.calories.method !== 'whoop') {
-			const weightKg = settings.current.bodyWeightKg ?? (await readLatestBodyWeightKg()) ?? undefined;
-			const est = estimateCalories({
-				durationSec,
-				weightKg,
-				age: settings.current.birthYear ? new Date().getFullYear() - settings.current.birthYear : undefined,
-				sex: settings.current.sex,
-				whoopKilojoule: updated.whoop?.kilojoule,
-				whoopDurationSec: updated.whoop?.durationSec,
-				hrSamples: samples,
-				intensityScore: updated.intensity?.score ?? fresh.intensity?.score
-			});
-			if (est && (!fresh.calories || RANK[est.method] > RANK[fresh.calories.method])) {
-				updated.calories = est;
+		const repo = getRepository();
+		return await repo.patchSessionHealth(session.id, (fresh) => {
+			const updated: WorkoutSession = { ...fresh };
+			let changed = false;
+			if (intensityPatch && !fresh.intensity) {
+				updated.intensity = intensityPatch;
 				changed = true;
 			}
-		}
-
-		if (!changed) return null;
-		await repo.upsertSession(updated);
-		return updated;
+			if (whoopPatch && !fresh.whoop) {
+				updated.whoop = whoopPatch;
+				changed = true;
+			}
+			// Source 3 — calories. Tiers are RANKED (whoop > hr > met) and an estimate
+			// only ever replaces a strictly lower-ranked one — monotonic, so numbers
+			// upgrade as better data lands and never flip-flop between recomputes.
+			if (!fresh.calories || fresh.calories.method !== 'whoop') {
+				const est = estimateCalories({
+					durationSec,
+					weightKg,
+					age,
+					sex,
+					whoopKilojoule: updated.whoop?.kilojoule,
+					whoopDurationSec: updated.whoop?.durationSec,
+					hrSamples: samples,
+					intensityScore: updated.intensity?.score ?? fresh.intensity?.score
+				});
+				if (est && (!fresh.calories || RANK[est.method] > RANK[fresh.calories.method])) {
+					updated.calories = est;
+					changed = true;
+				}
+			}
+			return changed ? updated : null;
+		});
 	} catch {
 		return null;
 	}

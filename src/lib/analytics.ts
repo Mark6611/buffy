@@ -22,6 +22,21 @@ function startOfWeek(d: Date): Date {
 	s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); // Monday
 	return s;
 }
+// Calendar-safe day arithmetic. Adding a fixed 86_400_000 ms to a local-midnight
+// epoch lands an hour off across a DST transition (local midnights are 23 or 25 h
+// apart), which shifts week/day buckets by one and silently drops sessions or breaks
+// streaks. setDate() steps by calendar days regardless of DST, so all week/day
+// indices below are derived through this, never through ± DAY/WEEK on raw epochs.
+function addDays(d: Date, days: number): Date {
+	const r = new Date(d);
+	r.setDate(r.getDate() + days);
+	return r;
+}
+// whole weeks from base (a local-midnight Monday) to the week of `date`; round
+// absorbs the ±1 h DST drift that would make floor land on the wrong bucket.
+function weekIndex(date: Date, base: Date): number {
+	return Math.round((startOfWeek(date).getTime() - base.getTime()) / WEEK);
+}
 function md(d: Date): string {
 	return `${d.getMonth() + 1}/${d.getDate()}`;
 }
@@ -29,11 +44,14 @@ function md(d: Date): string {
 function weeksInWindow(sessions: WorkoutSession[], win: TrendWindow, now: Date): number {
 	if (win !== 'all') return WINDOW_WEEKS[win];
 	const first = sessions.reduce((min, s) => Math.min(min, Date.parse(s.startedAt)), now.getTime());
-	return Math.max(1, Math.floor((startOfWeek(now).getTime() - startOfWeek(new Date(first)).getTime()) / WEEK) + 1);
+	return Math.max(1, Math.round((startOfWeek(now).getTime() - startOfWeek(new Date(first)).getTime()) / WEEK) + 1);
+}
+function windowStart(n: number, now: Date): Date {
+	return addDays(startOfWeek(now), -(n - 1) * 7); // local-midnight Monday of the oldest week
 }
 function inWindow(sessions: WorkoutSession[], win: TrendWindow, now: Date): WorkoutSession[] {
 	const n = weeksInWindow(sessions, win, now);
-	const cut = startOfWeek(now).getTime() - (n - 1) * WEEK;
+	const cut = windowStart(n, now).getTime();
 	return sessions
 		.filter((s) => Date.parse(s.startedAt) >= cut)
 		.sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
@@ -50,14 +68,16 @@ export interface Kpis {
 	timeDeltaPct: number | null;
 }
 export function kpis(sessions: WorkoutSession[], now = new Date()): Kpis {
-	const tw0 = startOfWeek(now).getTime();
-	const lw0 = tw0 - WEEK;
+	const tw0d = startOfWeek(now);
+	const tw0 = tw0d.getTime();
+	const lw0 = addDays(tw0d, -7).getTime();
+	const nw0 = addDays(tw0d, 7).getTime();
 	const between = (from: number, to: number) =>
 		sessions.filter((s) => {
 			const t = Date.parse(s.startedAt);
 			return t >= from && t < to;
 		});
-	const tw = between(tw0, tw0 + WEEK);
+	const tw = between(tw0, nw0);
 	const lw = between(lw0, tw0);
 	const vol = (a: WorkoutSession[]) => a.reduce((x, s) => x + sessionVolume(s), 0);
 	const time = (a: WorkoutSession[]) => a.reduce((x, s) => x + (sessionDurationSec(s) ?? 0), 0);
@@ -76,12 +96,12 @@ export function kpis(sessions: WorkoutSession[], now = new Date()): Kpis {
 /** Consecutive days (ending today/yesterday) with at least one session. */
 export function streakDays(sessions: WorkoutSession[], now = new Date()): number {
 	const days = new Set(sessions.map((s) => startOfDay(new Date(s.startedAt)).getTime()));
-	let cursor = startOfDay(now).getTime();
-	if (!days.has(cursor)) cursor -= DAY; // today may be a rest day
+	let cursor = startOfDay(now);
+	if (!days.has(cursor.getTime())) cursor = startOfDay(addDays(cursor, -1)); // today may be a rest day
 	let streak = 0;
-	while (days.has(cursor)) {
+	while (days.has(cursor.getTime())) {
 		streak++;
-		cursor -= DAY;
+		cursor = startOfDay(addDays(cursor, -1)); // calendar step — DST-safe, never lands at 23:00/01:00
 	}
 	return streak;
 }
@@ -93,14 +113,14 @@ export interface WeeklyVolume {
 }
 export function weeklyVolume(sessions: WorkoutSession[], win: TrendWindow, now = new Date()): WeeklyVolume {
 	const n = weeksInWindow(sessions, win, now);
-	const base = startOfWeek(now).getTime() - (n - 1) * WEEK;
+	const base = windowStart(n, now);
 	const buckets = Array.from({ length: n }, () => 0);
 	for (const s of inWindow(sessions, win, now)) {
-		const wi = Math.floor((startOfWeek(new Date(s.startedAt)).getTime() - base) / WEEK);
+		const wi = weekIndex(new Date(s.startedAt), base);
 		if (wi >= 0 && wi < n) buckets[wi] += sessionVolume(s);
 	}
 	return {
-		weeks: buckets.map((v, i) => ({ l: md(new Date(base + i * WEEK)), v: Math.round((v / 1000) * 10) / 10 })),
+		weeks: buckets.map((v, i) => ({ l: md(addDays(base, i * 7)), v: Math.round((v / 1000) * 10) / 10 })),
 		totalK: Math.round(buckets.reduce((a, b) => a + b, 0) / 1000)
 	};
 }
@@ -113,20 +133,25 @@ export interface Heat {
 }
 export function heatmap(sessions: WorkoutSession[], win: TrendWindow, now = new Date()): Heat {
 	const n = weeksInWindow(sessions, win, now);
-	const base = startOfWeek(now).getTime() - (n - 1) * WEEK;
+	const base = windowStart(n, now);
 	const list = inWindow(sessions, win, now);
 	const dayVol = new Map<number, number>();
+	const daysTrained = new Set<number>();
 	for (const s of list) {
 		const d = startOfDay(new Date(s.startedAt)).getTime();
 		dayVol.set(d, (dayVol.get(d) ?? 0) + sessionVolume(s));
+		daysTrained.add(d); // a bodyweight-only day has 0 volume but is still a trained day
 	}
 	const max = Math.max(1, ...dayVol.values());
 	const weeks: number[][] = [];
 	for (let w = 0; w < n; w++) {
 		const row: number[] = [];
 		for (let d = 0; d < 7; d++) {
-			const v = dayVol.get(base + w * WEEK + d * DAY) ?? 0;
-			row.push(v <= 0 ? 0 : v > max * 0.66 ? 3 : v > max * 0.33 ? 2 : 1);
+			const key = startOfDay(addDays(base, w * 7 + d)).getTime();
+			const v = dayVol.get(key) ?? 0;
+			// floor any trained day to 1 so calisthenics-only sessions (volume 0) never
+			// render identical to a rest day while still counting in the header/streak.
+			row.push(v > max * 0.66 ? 3 : v > max * 0.33 ? 2 : v > 0 || daysTrained.has(key) ? 1 : 0);
 		}
 		weeks.push(row);
 	}
@@ -361,11 +386,11 @@ const PULL = new Set(['Lats', 'Back', 'Biceps', 'Hamstrings', 'Traps']);
 /** Weekly push vs pull set counts (last up-to-8 weeks) — for the balance trend line. */
 export function pushPull(sessions: WorkoutSession[], byId: Map<string, Exercise>, win: TrendWindow, now = new Date()) {
 	const n = weeksInWindow(sessions, win, now);
-	const base = startOfWeek(now).getTime() - (n - 1) * WEEK;
+	const base = windowStart(n, now);
 	const push = Array.from({ length: n }, () => 0);
 	const pull = Array.from({ length: n }, () => 0);
 	for (const s of inWindow(sessions, win, now)) {
-		const wi = Math.floor((startOfWeek(new Date(s.startedAt)).getTime() - base) / WEEK);
+		const wi = weekIndex(new Date(s.startedAt), base);
 		if (wi < 0 || wi >= n) continue;
 		for (const le of s.exercises) {
 			const ex = byId.get(le.exerciseId);
@@ -377,7 +402,7 @@ export function pushPull(sessions: WorkoutSession[], byId: Map<string, Exercise>
 			}
 		}
 	}
-	const labels = Array.from({ length: n }, (_, i) => md(new Date(base + i * WEEK)));
+	const labels = Array.from({ length: n }, (_, i) => md(addDays(base, i * 7)));
 	const start = Math.max(0, n - 8);
 	return { labels: labels.slice(start), push: push.slice(start), pull: pull.slice(start) };
 }

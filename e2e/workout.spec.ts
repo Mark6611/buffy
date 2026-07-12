@@ -172,14 +172,26 @@ test('exercises can be reordered from the swipe actions', async ({ page }) => {
 	await expect(page).toHaveURL(/\/workout/);
 
 	const names = page.locator('.ex-name');
-	const first = await names.first().textContent();
 	const blocks = page.locator('.ex-block');
+	const count = await blocks.count();
+	const first = (await names.nth(0).textContent())!;
+	const second = (await names.nth(1).textContent())!;
+
+	// Move exercise 0 down → it must SWAP with exercise 1 (full order asserted), and
+	// the block count must be unchanged. The old test only checked "name at 0 changed",
+	// which also passes if Move-down deletes the exercise or scrambles the list.
 	await swipeOpen(page, blocks.first().locator('.swipe-content'));
 	await blocks.first().getByRole('button', { name: 'Move down' }).click();
-	await expect(names.first()).not.toHaveText(first!);
-	// and back up
-	const lastIdx = (await blocks.count()) - 1;
-	// the moved exercise sits wherever it landed — move whichever is now first down was enough; assert order actually changed
+	await expect(blocks).toHaveCount(count);
+	await expect(names.nth(0)).toHaveText(second);
+	await expect(names.nth(1)).toHaveText(first);
+
+	// Move it back up → the original order is fully restored.
+	await swipeOpen(page, blocks.nth(1).locator('.swipe-content'));
+	await blocks.nth(1).getByRole('button', { name: 'Move up' }).click();
+	await expect(blocks).toHaveCount(count);
+	await expect(names.nth(0)).toHaveText(first);
+	await expect(names.nth(1)).toHaveText(second);
 });
 
 test('the rest timer starts even when logging out of the superset round order', async ({ page }) => {

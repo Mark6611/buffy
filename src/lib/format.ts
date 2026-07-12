@@ -54,6 +54,12 @@ export function hhmm(iso: string): string {
 	return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** seconds → "H:MM" clock. Rounds to whole minutes and carries — never "1:60". */
+export function hoursMinutes(sec: number): string {
+	const m = Math.round(sec / 60);
+	return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+
 /** seconds → "45 min" / "1 hr 15 min" */
 export function durationLabel(sec: number): string {
 	const m = Math.round(sec / 60);

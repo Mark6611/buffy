@@ -139,7 +139,7 @@
 
 				<div class="h-sec" style="margin-bottom:10px">Logged exercises</div>
 				<div style="display:flex;flex-direction:column;gap:10px">
-					{#each s.exercises as le (le.exerciseId)}
+					{#each s.exercises as le, i (le.exerciseId + ':' + i)}
 						<div class="card card-pad">
 							{#if le.groupId}
 								<span class="chip accent" style="font-size:10.5px;padding:3px 8px;margin-bottom:8px">

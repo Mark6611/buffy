@@ -154,6 +154,11 @@ class WhoopStore {
 		const expected = localStorage.getItem(STATE_KEY);
 		localStorage.removeItem(STATE_KEY);
 		if (!code || !expected || state !== expected) {
+			// The relay page delivers the same deep link twice (an auto-redirect AND a
+			// manual "Open Buffy" link that appears after 1.5s), so a second call arrives
+			// after the first already consumed STATE_KEY and connected. Don't flip an
+			// established connection into 'Connection failed'.
+			if (this.connected && !expected) return true;
 			this.lastError = 'Connection failed — try again.';
 			return false;
 		}
@@ -213,14 +218,22 @@ class WhoopStore {
 					if (!r.ok) {
 						// Rotated-away or revoked refresh token — there is no recovery
 						// besides reconnecting, so surface the disconnected state honestly.
-						if (r.status === 400 || r.status === 401) {
+						// Guard against a concurrent reconnect: if this.tokens no longer holds
+						// the grant we set out to refresh, a fresh connect already replaced it —
+						// don't wipe the new tokens (or flip to disconnected) on our stale 400.
+						if ((r.status === 400 || r.status === 401) && this.tokens?.refreshToken === t.refreshToken) {
 							await this.save(null);
+							this.today = null; // stop rendering a now-revoked connection's stats
+							this.todayFetchedMs = 0;
 							this.lastError = 'Whoop connection expired — reconnect from Settings.';
 						}
 						return null;
 					}
 					const body = await r.json();
 					if (!body.access_token || !body.refresh_token) return null;
+					// A reconnect landing mid-refresh already installed a newer grant — use it
+					// rather than overwriting it with the one we just rotated.
+					if (this.tokens?.refreshToken !== t.refreshToken) return this.tokens?.accessToken ?? null;
 					// Persist the ROTATED refresh token before anyone uses the access
 					// token — the old one is already dead on Whoop's side.
 					await this.save({
@@ -274,10 +287,25 @@ class WhoopStore {
 		if (memoValid && !force) return this.today;
 		// current physiological cycle = the one with end: null
 		const cycles = (await this.get('/v2/cycle?limit=1')) as
-			| { records?: { id: number; score_state?: string; score?: { strain?: number } }[] }
+			| { records?: { id: number; start?: string; end?: string | null; score_state?: string; score?: { strain?: number } }[] }
 			| null;
 		const cycle = cycles?.records?.[0];
-		if (!cycle) return this.today;
+		if (!cycle) {
+			// Fetch failed. The memo guard above is bypassed when !force, so fall back to
+			// this.today ONLY if it was itself fetched today — never serve yesterday's
+			// scores as today's.
+			const sameDay =
+				this.today != null && new Date(this.todayFetchedMs).toDateString() === new Date().toDateString();
+			return sameDay ? this.today : null;
+		}
+		// Only the CURRENT cycle (end === null) is "today". If the strap hasn't synced,
+		// `limit=1` returns the latest COMPLETED cycle instead, whose recovery/strain were
+		// scored days ago — publishing it would show stale physiology as today's readiness.
+		if (cycle.end != null) {
+			this.today = null;
+			this.todayFetchedMs = Date.now();
+			return null;
+		}
 		const out: WhoopToday = {};
 		if (cycle.score_state === 'SCORED' && typeof cycle.score?.strain === 'number') {
 			out.dayStrain = cycle.score.strain;
@@ -316,9 +344,14 @@ class WhoopStore {
 				(st?.total_rem_sleep_time_milli ?? 0);
 			if (ms > 0) out.sleepHours = ms / 3_600_000;
 		}
-		this.today = out;
+		// Preserve same-day fields whose sub-fetch failed this round rather than blanking
+		// a value already on screen — a transient recovery/sleep miss shouldn't wipe the
+		// Recovery % the user is looking at.
+		const prevSameDay =
+			this.today != null && new Date(this.todayFetchedMs).toDateString() === new Date().toDateString();
+		this.today = prevSameDay ? { ...this.today, ...out } : out;
 		this.todayFetchedMs = Date.now();
-		return out;
+		return this.today;
 	}
 
 	/** The Whoop workout matching a Buffy session's time window, if any. */
