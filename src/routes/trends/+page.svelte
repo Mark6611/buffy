@@ -24,6 +24,7 @@
 	import Heatmap from '$lib/components/charts/Heatmap.svelte';
 	import Spark from '$lib/components/charts/Spark.svelte';
 	import HBars from '$lib/components/charts/HBars.svelte';
+	import BodyWeightCard from '$lib/components/BodyWeightCard.svelte';
 
 	let sessions = $state<WorkoutSession[]>([]);
 	let byId = $state<Map<string, Exercise>>(new Map());
@@ -204,6 +205,13 @@
 					</div>
 					<Icon name="chevR" size={18} color="var(--ink-3)" />
 				</button>
+			</div>
+		{/if}
+
+		<!-- Body weight — always available (independent of session count); local-only -->
+		{#if loaded}
+			<div class="pad" style="margin-bottom:16px">
+				<BodyWeightCard />
 			</div>
 		{/if}
 	</div>

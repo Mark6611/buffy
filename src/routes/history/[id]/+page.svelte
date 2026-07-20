@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import { getRepository } from '$lib/db';
 	import { captureSessionIntensity } from '$lib/sessionIntensity';
-	import { sessionVolume, sessionSetCount, sessionDurationSec } from '$lib/compute';
+	import { sessionVolume, sessionSetCount, sessionDurationSec, cardioSplit500Sec } from '$lib/compute';
 	import { relativeDay, hhmm, mmss, kg, volK } from '$lib/format';
 	import type { WorkoutSession, Exercise, LoggedExercise } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
@@ -51,6 +51,8 @@
 	{@const tt = ex?.trackingType ?? 'weight_reps'}
 	{@const bw = ex?.loadType === 'bodyweight'}
 	{@const perSide = ex?.loadType === 'per_side'}
+	{@const cardioDist = ex?.cardioMetric === 'distance'}
+	{@const hasRpe = le.sets.some((x) => x.completed && x.rpe != null)}
 	<div class="ex-head" style="padding-bottom:4px">
 		<Thumb equip={ex?.equipment ?? 'dumbbell'} size="sm" />
 		<div class="ex-title">
@@ -61,11 +63,15 @@
 	<table class="settable">
 		<thead>
 			{#if tt === 'cardio'}
-				<tr><th class="l" style="width:34px">Set</th><th>Time</th><th>Incline</th><th>Speed</th></tr>
+				{#if cardioDist}
+					<tr><th class="l" style="width:34px">Set</th><th>Time</th><th>Meters</th><th>/500m</th></tr>
+				{:else}
+					<tr><th class="l" style="width:34px">Set</th><th>Time</th><th>Incline</th><th>Speed</th></tr>
+				{/if}
 			{:else if tt === 'time_hold'}
 				<tr><th class="l" style="width:38px">Set</th><th>Rest</th><th>Hold</th></tr>
 			{:else}
-				<tr><th class="l" style="width:38px">Set</th><th>Rest</th><th>Reps</th>{#if !bw}<th>kg{#if perSide}<span class="col-x2"> ×2</span>{/if}</th>{/if}</tr>
+				<tr><th class="l" style="width:38px">Set</th><th>Rest</th><th>Reps</th>{#if !bw}<th>kg{#if perSide}<span class="col-x2"> ×2</span>{/if}</th>{/if}{#if hasRpe}<th>RPE</th>{/if}</tr>
 			{/if}
 		</thead>
 		<tbody>
@@ -73,11 +79,15 @@
 				<tr>
 					<td class="l muted">{i + 1}</td>
 					{#if tt === 'cardio'}
-						<td>{mmss(set.timeSec ?? 0)}</td><td>{set.incline ?? 0}%</td><td>{set.speed ?? 0}</td>
+						{#if cardioDist}
+							<td>{mmss(set.timeSec ?? 0)}</td><td>{set.distanceMeters ?? 0}</td><td class="muted">{cardioSplit500Sec(set) != null ? mmss(cardioSplit500Sec(set)!) : '—'}</td>
+						{:else}
+							<td>{mmss(set.timeSec ?? 0)}</td><td>{set.incline ?? 0}%</td><td>{set.speed ?? 0}</td>
+						{/if}
 					{:else if tt === 'time_hold'}
 						<td class="muted">{set.restTakenSec ? mmss(set.restTakenSec) : '—'}</td><td>{mmss(set.durationSec ?? 0)}</td>
 					{:else}
-						<td class="muted">{set.restTakenSec ? mmss(set.restTakenSec) : '—'}</td><td>{set.reps ?? ''}</td>{#if !bw}<td>{kg(set.weight)}</td>{/if}
+						<td class="muted">{set.restTakenSec ? mmss(set.restTakenSec) : '—'}</td><td>{set.reps ?? ''}</td>{#if !bw}<td>{kg(set.weight)}</td>{/if}{#if hasRpe}<td class="muted">{set.rpe ?? '—'}</td>{/if}
 					{/if}
 				</tr>
 			{/each}

@@ -9,6 +9,7 @@
 	import { exportJSON } from '$lib/data';
 	import { relativeDay } from '$lib/format';
 	import TopBar from '$lib/components/TopBar.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	let syncing = $state(false);
 	let syncMessage = $state('');
@@ -155,6 +156,11 @@
 					</div>
 					<div class="divider"></div>
 					<div class="row" style="justify-content:space-between">
+						<div><div style="font-weight:500">Track RPE</div><div class="txt-sm">optional 6–10 effort column on sets</div></div>
+						<button class="toggle {s.trackRpe ? 'on' : ''}" aria-label="toggle" onclick={() => settings.save({ trackRpe: !s.trackRpe })}><i></i></button>
+					</div>
+					<div class="divider"></div>
+					<div class="row" style="justify-content:space-between">
 						<div style="font-weight:500">Barbell step</div>
 						<input class="inp" type="number" step="0.5" style="width:64px" value={s.increments.barbell} onchange={(e) => saveIncrement('barbell', e.currentTarget.value)} />
 					</div>
@@ -271,9 +277,9 @@
 							{#if whoop.connected}
 								<span class="chip accent" style="font-size:12px">Connected</span>
 							{:else}
-								<button class="btn btn-ghost btn-sm" style="height:36px" onclick={() => whoop.connect()} disabled={whoop.connecting}>
+								<Button size="regular" variant="bordered" onclick={() => whoop.connect()} disabled={whoop.connecting}>
 									{whoop.connecting ? 'Connecting…' : 'Connect'}
-								</button>
+								</Button>
 							{/if}
 						</div>
 						{#if whoop.connected}
@@ -323,9 +329,9 @@
 									<div style="font-weight:500">Last synced</div>
 									<div class="txt-sm mono">{lastSync ? relativeDay(lastSync) : 'never'}</div>
 								</div>
-								<button class="btn btn-ghost btn-sm" style="height:36px" onclick={syncNow} disabled={syncing}>
+								<Button size="regular" variant="bordered" onclick={syncNow} disabled={syncing}>
 									{syncing ? 'Syncing…' : 'Sync now'}
-								</button>
+								</Button>
 							</div>
 						{/if}
 					</div>

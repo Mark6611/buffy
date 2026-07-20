@@ -9,6 +9,7 @@
 	import { mmss, parseMmss, equipLabel } from '$lib/format';
 	import type { Exercise, Equipment, TrackingType, LoadType } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
+	import Button from '$lib/components/Button.svelte';
 
 	const to = $derived($page.url.searchParams.get('to') ?? 'workout');
 	let name = $state('');
@@ -17,6 +18,9 @@
 	let perSide = $state(false);
 	let restSec = $state(90);
 	let muscle = $state('');
+	// cardio only — 'distance' (rower/erg: metres + time) vs 'speed' (treadmill:
+	// speed + incline + time). Defaults to distance since that's the new erg support.
+	let cardioMetric = $state<'speed' | 'distance'>('distance');
 
 	// Kept in sync with the muscle groups already used across the app (the seed
 	// catalog + analytics.ts's body-map / push-pull groupings) — not an invented list.
@@ -40,7 +44,7 @@
 	const tts: { v: TrackingType; t: string; s: string }[] = [
 		{ v: 'weight_reps', t: 'Weight × reps', s: 'logs weight + reps · auto-progression' },
 		{ v: 'time_hold', t: 'Time-hold', s: 'logs duration · progress by adding seconds' },
-		{ v: 'cardio', t: 'Cardio', s: 'logs time, incline, speed · log-only' }
+		{ v: 'cardio', t: 'Cardio', s: 'rowing, run, bike — distance or speed + time' }
 	];
 
 	let busy = $state(false);
@@ -65,6 +69,7 @@
 				loadType,
 				unilateral: perSide,
 				defaultTargetReps: trackingType === 'weight_reps' ? 10 : undefined,
+				cardioMetric: trackingType === 'cardio' ? cardioMetric : undefined,
 				weightStep: step,
 				defaultRestSec: restSec
 			};
@@ -88,7 +93,7 @@
 	<div class="topbar">
 		<button class="icon-btn" onclick={() => history.back()} aria-label="Back"><Icon name="back" size={20} /></button>
 		<div class="topbar-title">Custom Exercise</div>
-		<button class="btn btn-accent btn-sm" style="height:36px;padding:0 16px" onclick={add} disabled={busy}>Add</button>
+		<Button size="regular" onclick={add} disabled={busy}>Add</Button>
 	</div>
 	<div class="screen-body">
 		<div class="pad" style="padding-bottom:28px">
@@ -121,6 +126,14 @@
 					</button>
 				{/each}
 			</div>
+
+			{#if trackingType === 'cardio'}
+				<div class="txt-sm" style="margin-bottom:8px">CARDIO METRIC</div>
+				<div style="display:flex;gap:8px;margin-bottom:16px">
+					<button class="chip {cardioMetric === 'distance' ? 'solid' : ''}" style="flex:1;justify-content:center;height:38px" onclick={() => (cardioMetric = 'distance')}>Distance + time</button>
+					<button class="chip {cardioMetric === 'speed' ? 'solid' : ''}" style="flex:1;justify-content:center;height:38px" onclick={() => (cardioMetric = 'speed')}>Speed + incline</button>
+				</div>
+			{/if}
 
 			<div class="card">
 				<div class="row" style="justify-content:space-between">

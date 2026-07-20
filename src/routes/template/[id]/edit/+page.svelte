@@ -5,6 +5,7 @@
 	import { editor } from '$lib/stores/editor.svelte';
 	import { mmss, parseMmss } from '$lib/format';
 	import Icon from '$lib/components/Icon.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 
 	const id = $derived($page.params.id ?? '');
@@ -25,7 +26,7 @@
 	<div class="topbar">
 		<button class="icon-btn" onclick={() => history.back()} aria-label="Back"><Icon name="back" size={20} /></button>
 		<div class="topbar-title">{id === 'new' ? 'New Template' : 'Edit Template'}</div>
-		<button class="btn btn-accent btn-sm" style="height:36px;padding:0 16px" onclick={save}>Save</button>
+		<Button size="regular" onclick={save}>Save</Button>
 	</div>
 
 	<div class="screen-body">
@@ -51,6 +52,7 @@
 						{@const tt = ex?.trackingType ?? 'weight_reps'}
 						{@const bw = ex?.loadType === 'bodyweight'}
 						{@const perSide = ex?.loadType === 'per_side'}
+						{@const cardioDist = ex?.cardioMetric === 'distance'}
 						<div class="card card-pad" style={te.groupId ? 'border-color:var(--accent)' : ''}>
 							<div style="display:flex;align-items:center;gap:10px">
 								<button class="setcheck {editor.selection.has(i) ? 'done' : ''}" style="width:22px;height:22px" onclick={() => editor.toggleSelect(i)} aria-label="select">
@@ -60,7 +62,7 @@
 								<div style="flex:1;min-width:0">
 									<div class="ex-name" style="font-size:14px">{ex?.name}</div>
 									{#if te.groupId}
-										<button class="chip accent" style="font-size:10px;padding:2px 7px;margin-top:3px" onclick={() => editor.ungroup(te.groupId!)}>
+										<button class="chip accent chip-inline" style="font-size:10px;padding:2px 7px;margin-top:3px" onclick={() => editor.ungroup(te.groupId!)}>
 											<Icon name="link" size={10} color="var(--accent-ink)" sw={2.2} />Superset · ungroup
 										</button>
 									{/if}
@@ -71,7 +73,11 @@
 							<table class="settable" style="margin-top:8px">
 								<thead>
 									{#if tt === 'cardio'}
-										<tr><th class="l" style="width:34px">Set</th><th>Time</th><th>Incl</th><th>Spd</th></tr>
+										{#if cardioDist}
+											<tr><th class="l" style="width:34px">Set</th><th>Time</th><th>Meters</th></tr>
+										{:else}
+											<tr><th class="l" style="width:34px">Set</th><th>Time</th><th>Incl</th><th>Spd</th></tr>
+										{/if}
 									{:else if tt === 'time_hold'}
 										<tr><th class="l" style="width:34px">Set</th><th>Hold</th><th>Rest</th></tr>
 									{:else}
@@ -83,9 +89,14 @@
 										<tr>
 											<td class="l muted">{s + 1}</td>
 											{#if tt === 'cardio'}
-												<td><input class="inp" type="text" value={mmss(ps.targetTimeSec ?? 0)} onchange={(e) => (ps.targetTimeSec = parseMmss(e.currentTarget.value))} /></td>
-												<td><input class="inp" type="number" value={ps.targetIncline ?? ''} oninput={(e) => (ps.targetIncline = numOrUndef(e.currentTarget.value))} /></td>
-												<td><input class="inp" type="number" value={ps.targetSpeed ?? ''} oninput={(e) => (ps.targetSpeed = numOrUndef(e.currentTarget.value))} /></td>
+												{#if cardioDist}
+													<td><input class="inp" type="text" value={mmss(ps.targetTimeSec ?? 0)} onchange={(e) => (ps.targetTimeSec = parseMmss(e.currentTarget.value))} /></td>
+													<td><input class="inp" type="number" inputmode="numeric" value={ps.targetDistanceMeters ?? ''} oninput={(e) => (ps.targetDistanceMeters = numOrUndef(e.currentTarget.value))} /></td>
+												{:else}
+													<td><input class="inp" type="text" value={mmss(ps.targetTimeSec ?? 0)} onchange={(e) => (ps.targetTimeSec = parseMmss(e.currentTarget.value))} /></td>
+													<td><input class="inp" type="number" value={ps.targetIncline ?? ''} oninput={(e) => (ps.targetIncline = numOrUndef(e.currentTarget.value))} /></td>
+													<td><input class="inp" type="number" value={ps.targetSpeed ?? ''} oninput={(e) => (ps.targetSpeed = numOrUndef(e.currentTarget.value))} /></td>
+												{/if}
 											{:else if tt === 'time_hold'}
 												<td><input class="inp" type="text" value={mmss(ps.targetDurationSec ?? 0)} onchange={(e) => (ps.targetDurationSec = parseMmss(e.currentTarget.value))} /></td>
 												<td><input class="inp" type="text" value={mmss(ps.targetRestSec ?? 0)} onchange={(e) => (ps.targetRestSec = parseMmss(e.currentTarget.value))} /></td>
@@ -99,25 +110,25 @@
 								</tbody>
 							</table>
 							<div style="display:flex;gap:8px;margin-top:8px">
-								<button class="btn btn-ghost btn-sm" style="flex:1" onclick={() => editor.addSet(i)}><Icon name="plus" size={15} />Add set</button>
-								<button class="btn btn-ghost btn-sm" style="flex:1" onclick={() => editor.removeSet(i)}><Icon name="minus" size={15} />Remove</button>
+								<Button size="medium" variant="bordered" style="flex:1" onclick={() => editor.addSet(i)}><Icon name="plus" size={15} />Add set</Button>
+								<Button size="medium" variant="bordered" style="flex:1" onclick={() => editor.removeSet(i)}><Icon name="minus" size={15} />Remove</Button>
 							</div>
 						</div>
 					{/each}
 				</div>
 
-				<button class="btn btn-ghost btn-block" style="margin-top:14px" onclick={() => { editor.keepDraft = true; goto('/picker?to=tpl'); }}>
+				<Button variant="bordered" full style="margin-top:14px" onclick={() => { editor.keepDraft = true; goto('/picker?to=tpl'); }}>
 					<Icon name="plus" size={18} />Add exercise
-				</button>
+				</Button>
 			</div>
 		{/if}
 	</div>
 
 	{#if editor.selection.size >= 2}
 		<div class="actionbar">
-			<button class="btn btn-accent" style="flex:1" onclick={() => editor.groupSelected()}>
+			<Button style="flex:1" onclick={() => editor.groupSelected()}>
 				<Icon name="link" size={18} color="#fff" />Group as superset · {editor.selection.size}
-			</button>
+			</Button>
 		</div>
 	{/if}
 </div>

@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { mmss, kg, parseMmss } from '$lib/format';
+	import { cardioSplit500Sec } from '$lib/compute';
+	import Button from '$lib/components/Button.svelte';
 	import { platesPerSide, formatPerSide } from '$lib/plates';
 	import { autoBackup } from '$lib/data';
 	import { captureSessionIntensity } from '$lib/sessionIntensity';
@@ -271,7 +273,7 @@
 						: 'no exercises'}
 				</div>
 			</div>
-			<button class="btn btn-accent btn-sm" style="height:36px;padding:0 14px" onclick={finish} disabled={finishing}>Finish</button>
+			<Button size="regular" onclick={finish} disabled={finishing}>Finish</Button>
 		</div>
 
 		<div class="screen-body">
@@ -284,6 +286,7 @@
 					{@const bw = ex?.loadType === 'bodyweight'}
 					{@const perSide = ex?.loadType === 'per_side'}
 					{@const tt = ex?.trackingType ?? 'weight_reps'}
+					{@const cardioDist = ex?.cardioMetric === 'distance'}
 					{@const sg = workout.suggestions[le.exerciseId]}
 					<div class="ex-block">
 						<SwipeActions bind:this={swipeRefs[exIndex]} actionsWidth={240} onOpen={() => closeOtherSwipes(exIndex)}>
@@ -321,11 +324,15 @@
 						<table class="settable">
 							<thead>
 								{#if tt === 'cardio'}
-									<tr><th class="c" style="width:34px"></th><th class="l" style="width:34px">Set</th><th>Time</th><th>Incline</th><th>Speed</th></tr>
+									{#if cardioDist}
+										<tr><th class="c" style="width:34px"></th><th class="l" style="width:34px">Set</th><th>Time</th><th>Meters</th><th>/500m</th></tr>
+									{:else}
+										<tr><th class="c" style="width:34px"></th><th class="l" style="width:34px">Set</th><th>Time</th><th>Incline</th><th>Speed</th></tr>
+									{/if}
 								{:else if tt === 'time_hold'}
 									<tr><th class="c" style="width:34px"></th><th class="l" style="width:38px">Set</th><th>Rest</th><th>Hold</th></tr>
 								{:else}
-									<tr><th class="c" style="width:34px"></th><th class="l" style="width:38px">Set</th><th>Rest</th><th>Reps</th>{#if !bw}<th style="width:{perSide ? 74 : 58}px">kg{#if perSide}<span class="col-x2"> ×2</span>{/if}</th>{/if}</tr>
+									<tr><th class="c" style="width:34px"></th><th class="l" style="width:38px">Set</th><th>Rest</th><th>Reps</th>{#if !bw}<th style="width:{perSide ? 74 : 58}px">kg{#if perSide}<span class="col-x2"> ×2</span>{/if}</th>{/if}{#if settings.current.trackRpe}<th style="width:44px">RPE</th>{/if}</tr>
 								{/if}
 							</thead>
 							<tbody>
@@ -347,9 +354,15 @@
 										<td class="l muted" style="font-weight:600;{isActive ? 'color:var(--accent-ink)' : ''}">{s + 1}</td>
 
 										{#if tt === 'cardio'}
-											<td><input class="inp" type="text" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
-											<td><input class="inp" type="number" value={set.incline ?? ''} oninput={(e) => (set.incline = numOrUndef(e.currentTarget.value))} /></td>
-											<td><input class="inp" type="number" value={set.speed ?? ''} oninput={(e) => (set.speed = numOrUndef(e.currentTarget.value))} /></td>
+											{#if cardioDist}
+												<td><input class="inp" type="text" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" inputmode="numeric" value={set.distanceMeters ?? ''} oninput={(e) => (set.distanceMeters = numOrUndef(e.currentTarget.value))} /></td>
+												<td class="muted">{cardioSplit500Sec(set) != null ? mmss(cardioSplit500Sec(set)!) : '—'}</td>
+											{:else}
+												<td><input class="inp" type="text" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" value={set.incline ?? ''} oninput={(e) => (set.incline = numOrUndef(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" value={set.speed ?? ''} oninput={(e) => (set.speed = numOrUndef(e.currentTarget.value))} /></td>
+											{/if}
 										{:else if tt === 'time_hold'}
 											{@render restCell(exIndex, s, set)}
 											<td><input class="inp" type="text" value={mmss(set.durationSec ?? 0)} onchange={(e) => (set.durationSec = parseMmss(e.currentTarget.value))} /></td>
@@ -358,6 +371,9 @@
 											<td><input class="inp" type="number" value={set.reps ?? ''} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} /></td>
 											{#if !bw}
 												<td><input class="inp" type="number" step="0.5" value={set.weight ?? ''} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} /></td>
+											{/if}
+											{#if settings.current.trackRpe}
+												<td><input class="inp" type="number" step="0.5" min="6" max="10" inputmode="decimal" value={set.rpe ?? ''} oninput={(e) => (set.rpe = numOrUndef(e.currentTarget.value))} /></td>
 											{/if}
 										{/if}
 									</tr>
@@ -395,9 +411,9 @@
 						{/if}
 					</div>
 				{/each}
-				<button class="btn btn-ghost btn-block" style="margin-top:6px" onclick={() => goto('/picker?to=workout')}>
+				<Button variant="bordered" full style="margin-top:6px" onclick={() => goto('/picker?to=workout')}>
 					<Icon name="plus" size={18} />Add exercise
-				</button>
+				</Button>
 
 				<div style="margin-top:20px">
 					<div class="h-sec" style="margin-bottom:8px">Session notes</div>
@@ -414,39 +430,36 @@
 {/if}
 
 {#if syncPrompt}
-	<button
-		style="position:fixed;inset:0;background:rgba(20,16,12,0.4);z-index:40;border:none"
-		aria-label="Dismiss"
-		onclick={finalizeSync}
-		disabled={syncBusy}
-	></button>
-	<div style="position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-radius:24px 24px 0 0;padding:22px 20px calc(30px + env(safe-area-inset-bottom,0));box-shadow:0 -10px 40px rgba(0,0,0,0.2);max-width:480px;margin:0 auto">
-		<div style="width:40px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 18px"></div>
+	<button class="sheet-backdrop" aria-label="Dismiss" onclick={finalizeSync} disabled={syncBusy}></button>
+	<div class="sheet">
+		<div class="sheet-grip"></div>
 		<span class="stat-ic" style="width:46px;height:46px;background:var(--accent-tint);margin-bottom:14px"><Icon name="swap" size={22} color="var(--accent-ink)" /></span>
 
 		{#if syncPrompt.template}
 			<div class="h-card" style="font-size:19px;margin-bottom:6px">Update “{syncPrompt.template.name}”?</div>
 			<div class="txt" style="margin-bottom:16px">You made changes this workout — apply them back to the template for next time?</div>
 			<div style="display:flex;flex-direction:column;gap:9px">
-				<button class="btn btn-accent" onclick={() => chooseTemplateSync('full')} disabled={syncBusy}>
+				<Button onclick={() => chooseTemplateSync('full')} disabled={syncBusy}>
 					Update whole template
-				</button>
-				<button class="btn btn-ghost" onclick={() => chooseTemplateSync('weightsOnly')} disabled={syncBusy}>
+				</Button>
+				<Button variant="bordered" onclick={() => chooseTemplateSync('weightsOnly')} disabled={syncBusy}>
 					Update weights only
-				</button>
-				<button class="btn btn-ghost" style="color:var(--ink-3)" onclick={() => chooseTemplateSync('none')} disabled={syncBusy}>
-					{syncBusy ? 'Working…' : "Leave template as-is"}
-				</button>
+				</Button>
+				<!-- the dismissive third option is the kit's Default (plain) style, not a
+				     third outlined pill fighting the two above for weight -->
+				<Button variant="plain" onclick={() => chooseTemplateSync('none')} disabled={syncBusy}>
+					{syncBusy ? 'Working…' : 'Leave template as-is'}
+				</Button>
 			</div>
 		{:else}
 			<div class="h-card" style="font-size:19px;margin-bottom:6px">Save as a template?</div>
 			<div class="txt" style="margin-bottom:14px">Turn this quick-logged workout into a reusable template.</div>
 			<input class="inp" style="width:100%;height:44px;margin-bottom:16px" type="text" placeholder="Template name" bind:value={newTemplateName} />
 			<div style="display:flex;gap:10px">
-				<button class="btn btn-ghost" style="flex:1" onclick={() => saveAsNewTemplate(false)} disabled={syncBusy}>Don't save</button>
-				<button class="btn btn-accent" style="flex:1.3" onclick={() => saveAsNewTemplate(true)} disabled={syncBusy || !newTemplateName.trim()}>
+				<Button variant="bordered" style="flex:1" onclick={() => saveAsNewTemplate(false)} disabled={syncBusy}>Don't save</Button>
+				<Button style="flex:1.3" onclick={() => saveAsNewTemplate(true)} disabled={syncBusy || !newTemplateName.trim()}>
 					{syncBusy ? 'Working…' : 'Save as template'}
-				</button>
+				</Button>
 			</div>
 		{/if}
 		{#if syncError}

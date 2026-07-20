@@ -6,78 +6,93 @@
 //
 // The concrete Dexie implementation lives in ./dexie.ts; get the singleton via ./index.ts.
 
-import type { Exercise, Template, WorkoutSession, Settings, ID } from '$lib/types';
+import type {
+  Exercise,
+  Template,
+  WorkoutSession,
+  Settings,
+  ID,
+  BodyWeightEntry,
+} from "$lib/types";
 
 export interface Repository {
-	// Deletes are TOMBSTONES, not row removals: deleteX stamps deletedAt (and bumps
-	// updatedAt) so the deletion itself syncs across devices via the same
-	// last-write-wins path as any edit — a hard row delete would just get
-	// resurrected by the next pull. listX/getX hide tombstoned records; only the
-	// listXForSync methods below still see them.
+  // Deletes are TOMBSTONES, not row removals: deleteX stamps deletedAt (and bumps
+  // updatedAt) so the deletion itself syncs across devices via the same
+  // last-write-wins path as any edit — a hard row delete would just get
+  // resurrected by the next pull. listX/getX hide tombstoned records; only the
+  // listXForSync methods below still see them.
 
-	// --- exercises (catalog) ---
-	listExercises(): Promise<Exercise[]>;
-	getExercise(id: ID): Promise<Exercise | undefined>;
-	upsertExercise(ex: Exercise): Promise<void>;
-	deleteExercise(id: ID): Promise<void>;
+  // --- exercises (catalog) ---
+  listExercises(): Promise<Exercise[]>;
+  getExercise(id: ID): Promise<Exercise | undefined>;
+  upsertExercise(ex: Exercise): Promise<void>;
+  deleteExercise(id: ID): Promise<void>;
 
-	// --- templates ---
-	listTemplates(): Promise<Template[]>;
-	getTemplate(id: ID): Promise<Template | undefined>;
-	upsertTemplate(t: Template): Promise<void>;
-	deleteTemplate(id: ID): Promise<void>;
+  // --- templates ---
+  listTemplates(): Promise<Template[]>;
+  getTemplate(id: ID): Promise<Template | undefined>;
+  upsertTemplate(t: Template): Promise<void>;
+  deleteTemplate(id: ID): Promise<void>;
 
-	// --- workout sessions (history) ---
-	/** newest first */
-	listSessions(): Promise<WorkoutSession[]>;
-	getSession(id: ID): Promise<WorkoutSession | undefined>;
-	upsertSession(s: WorkoutSession): Promise<void>;
-	deleteSession(id: ID): Promise<void>;
-	/**
-	 * Patch ONLY device-local health fields (intensity/whoop/calories) atomically,
-	 * WITHOUT bumping updatedAt. Those fields are stripped from iCloud sync, so a
-	 * health recompute must not move the last-write-wins clock — otherwise this
-	 * (possibly stale) local copy would win LWW and erase another device's real edit.
-	 * `patch` runs inside a transaction on the freshly-read record; return the record
-	 * to write, or null for a no-op. Resolves any async inputs (e.g. body weight)
-	 * BEFORE calling — the callback must be synchronous. Returns the written record or null.
-	 */
-	patchSessionHealth(
-		id: ID,
-		patch: (fresh: WorkoutSession) => WorkoutSession | null
-	): Promise<WorkoutSession | null>;
-	/** most recent session that logged this exercise — powers auto-progression "last time" anchors */
-	lastSessionForExercise(exerciseId: ID): Promise<WorkoutSession | undefined>;
+  // --- workout sessions (history) ---
+  /** newest first */
+  listSessions(): Promise<WorkoutSession[]>;
+  getSession(id: ID): Promise<WorkoutSession | undefined>;
+  upsertSession(s: WorkoutSession): Promise<void>;
+  deleteSession(id: ID): Promise<void>;
+  /**
+   * Patch ONLY device-local health fields (intensity/whoop/calories) atomically,
+   * WITHOUT bumping updatedAt. Those fields are stripped from iCloud sync, so a
+   * health recompute must not move the last-write-wins clock — otherwise this
+   * (possibly stale) local copy would win LWW and erase another device's real edit.
+   * `patch` runs inside a transaction on the freshly-read record; return the record
+   * to write, or null for a no-op. Resolves any async inputs (e.g. body weight)
+   * BEFORE calling — the callback must be synchronous. Returns the written record or null.
+   */
+  patchSessionHealth(
+    id: ID,
+    patch: (fresh: WorkoutSession) => WorkoutSession | null
+  ): Promise<WorkoutSession | null>;
+  /** most recent session that logged this exercise — powers auto-progression "last time" anchors */
+  lastSessionForExercise(exerciseId: ID): Promise<WorkoutSession | undefined>;
 
-	// --- settings (singleton) ---
-	getSettings(): Promise<Settings>;
-	saveSettings(s: Settings): Promise<void>;
+  // --- body weight (Trends chart) ---
+  // LOCAL-ONLY: body weight is health data, so it never syncs to iCloud (5.1.3(ii)).
+  // It has no tombstones and is hard-deleted — nothing to converge across devices.
+  /** chronological (oldest first) */
+  listBodyWeights(): Promise<BodyWeightEntry[]>;
+  addBodyWeight(entry: BodyWeightEntry): Promise<void>;
+  deleteBodyWeight(id: ID): Promise<void>;
 
-	/** wipe all exercises, templates and sessions (used by restore → replace) */
-	clearAll(): Promise<void>;
+  // --- settings (singleton) ---
+  getSettings(): Promise<Settings>;
+  saveSettings(s: Settings): Promise<void>;
 
-	// --- iCloud sync only ---
-	// Sync needs the raw truth including tombstones: a tombstoned record must still
-	// be pushed (that's how the delete reaches other devices), and a tombstone that
-	// were invisible here would make the remote's live copy look "locally missing"
-	// and resurrect it. Never use these for UI.
-	listExercisesForSync(): Promise<Exercise[]>;
-	listTemplatesForSync(): Promise<Template[]>;
-	listSessionsForSync(): Promise<WorkoutSession[]>;
+  /** wipe all exercises, templates and sessions (used by restore → replace) */
+  clearAll(): Promise<void>;
 
-	// Every upsertX above always stamps updatedAt = now, because a normal write IS a
-	// fresh local edit. Applying a record PULLED from iCloud is different: its
-	// updatedAt is the very thing last-write-wins compares across devices, so writing
-	// it through upsertX would re-stamp it "now" on every device and make every synced
-	// record look like it just changed everywhere — breaking the comparison it's meant
-	// to power. These three preserve the timestamp exactly as given.
-	//
-	// They also enforce freshness AT THE WRITE: the record is only stored if it is
-	// strictly newer than whatever is in the DB at that moment. The sync pass plans
-	// its merge against a snapshot taken before a network round trip; without this
-	// guard, an edit made during that window could be clobbered by a remote record
-	// that beat the snapshot but is older than the edit.
-	applySyncedExercise(ex: Exercise): Promise<void>;
-	applySyncedTemplate(t: Template): Promise<void>;
-	applySyncedSession(s: WorkoutSession): Promise<void>;
+  // --- iCloud sync only ---
+  // Sync needs the raw truth including tombstones: a tombstoned record must still
+  // be pushed (that's how the delete reaches other devices), and a tombstone that
+  // were invisible here would make the remote's live copy look "locally missing"
+  // and resurrect it. Never use these for UI.
+  listExercisesForSync(): Promise<Exercise[]>;
+  listTemplatesForSync(): Promise<Template[]>;
+  listSessionsForSync(): Promise<WorkoutSession[]>;
+
+  // Every upsertX above always stamps updatedAt = now, because a normal write IS a
+  // fresh local edit. Applying a record PULLED from iCloud is different: its
+  // updatedAt is the very thing last-write-wins compares across devices, so writing
+  // it through upsertX would re-stamp it "now" on every device and make every synced
+  // record look like it just changed everywhere — breaking the comparison it's meant
+  // to power. These three preserve the timestamp exactly as given.
+  //
+  // They also enforce freshness AT THE WRITE: the record is only stored if it is
+  // strictly newer than whatever is in the DB at that moment. The sync pass plans
+  // its merge against a snapshot taken before a network round trip; without this
+  // guard, an edit made during that window could be clobbered by a remote record
+  // that beat the snapshot but is older than the edit.
+  applySyncedExercise(ex: Exercise): Promise<void>;
+  applySyncedTemplate(t: Template): Promise<void>;
+  applySyncedSession(s: WorkoutSession): Promise<void>;
 }
