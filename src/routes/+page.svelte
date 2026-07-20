@@ -13,6 +13,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import EqChip from '$lib/components/EqChip.svelte';
+	import Button from '$lib/components/Button.svelte';
 
 	let templates = $state<Template[]>([]);
 	let sessions = $state<WorkoutSession[]>([]);
@@ -114,8 +115,9 @@
 		{/if}
 
 		<div class="pad" style="margin-bottom:18px">
-			<button
-				class="btn btn-dark btn-block"
+			<Button
+				variant="dark"
+				full
 				style="justify-content:space-between"
 				onclick={() => goto('/quick')}
 			>
@@ -123,7 +125,7 @@
 					<Icon name="bolt" size={18} color="#fff" />Quick log a workout
 				</span>
 				<Icon name="arrowR" size={18} color="#fff" />
-			</button>
+			</Button>
 		</div>
 
 		{#if sessions.length}

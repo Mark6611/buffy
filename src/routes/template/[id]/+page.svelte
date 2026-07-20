@@ -8,6 +8,7 @@
 	import { workout } from '$lib/stores/workout.svelte';
 	import type { Template, Exercise, TemplateExercise } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import EqChip from '$lib/components/EqChip.svelte';
 	import MetaStat from '$lib/components/MetaStat.svelte';
@@ -124,11 +125,11 @@
 	</div>
 
 	<div class="actionbar">
-		<button class="btn btn-dark" style="flex:1.1" onclick={start}>
+		<Button variant="dark" style="flex:1.1" onclick={start}>
 			<Icon name="play" size={15} color="#fff" />Start
-		</button>
-		<button class="btn btn-accent" style="flex:1.3" onclick={() => goto(`/template/${id}/progression`)}>
+		</Button>
+		<Button style="flex:1.3" onclick={() => goto(`/template/${id}/progression`)}>
 			<Icon name="spark" size={17} color="#fff" />Auto-Progression
-		</button>
+		</Button>
 	</div>
 </div>

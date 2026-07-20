@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Button from '$lib/components/Button.svelte';
 
 	// Whoop's OAuth redirect lands here (registered redirect URI on the deployed
 	// site — Whoop requires https, so it can't point straight at the app). This
@@ -25,6 +26,6 @@
 	<div class="h-app" style="font-size:22px">Connecting Whoop…</div>
 	{#if failed}
 		<div class="txt-sm">If Buffy didn't open automatically, tap below on your iPhone.</div>
-		<a class="btn btn-dark" href={appUrl}>Open Buffy</a>
+		<Button variant="dark" href={appUrl}>Open Buffy</Button>
 	{/if}
 </div>

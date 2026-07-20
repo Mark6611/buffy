@@ -8,6 +8,7 @@
 	import { equipLabel } from '$lib/format';
 	import type { Exercise } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 
 	const to = $derived($page.url.searchParams.get('to') ?? 'workout');
@@ -69,10 +70,10 @@
 			</div>
 		</div>
 		<div class="pad">
-			<button class="btn btn-ghost btn-block" style="justify-content:flex-start;gap:11px;margin-bottom:12px" onclick={() => goto(`/exercise/new?to=${to}`)}>
+			<Button variant="bordered" full style="justify-content:flex-start;gap:11px;margin-bottom:12px" onclick={() => goto(`/exercise/new?to=${to}`)}>
 				<span class="thumb sm" style="background:var(--accent-tint);border:none;color:var(--accent-ink)"><Icon name="plus" size={18} sw={2.2} /></span>
 				Create custom exercise
-			</button>
+			</Button>
 			<div class="h-sec" style="margin:8px 0">Catalog</div>
 			<div class="card">
 				{#each shown as c, i (c.id)}

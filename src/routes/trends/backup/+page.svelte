@@ -4,6 +4,7 @@
 	import { exportJSON, exportCSV, parseBackup, importBackup, type BuffyBackup, type ImportMode } from '$lib/data';
 	import { relativeDay } from '$lib/format';
 	import TopBar from '$lib/components/TopBar.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
 	let counts = $state({ sessions: 0, templates: 0 });
@@ -142,7 +143,7 @@
 							<Icon name="doc" size={19} color="var(--ink-2)" />
 							<div><div style="font-weight:500">Full backup · JSON</div><div class="txt-sm">everything — templates, sessions, settings</div></div>
 						</div>
-						<button class="btn btn-dark btn-sm" style="height:38px" onclick={doExportJSON}><Icon name="download" size={16} color="#fff" />Export</button>
+						<Button size="medium" variant="dark" onclick={doExportJSON}><Icon name="download" size={16} color="#fff" />Export</Button>
 					</div>
 					<div class="divider"></div>
 					<div class="row" style="justify-content:space-between">
@@ -150,7 +151,7 @@
 							<Icon name="chart" size={19} color="var(--ink-2)" />
 							<div><div style="font-weight:500">Sessions · CSV</div><div class="txt-sm">one row per logged set · for spreadsheets</div></div>
 						</div>
-						<button class="btn btn-ghost btn-sm" style="height:38px" onclick={doExportCSV}><Icon name="download" size={16} />CSV</button>
+						<Button size="medium" variant="bordered" onclick={doExportCSV}><Icon name="download" size={16} />CSV</Button>
 					</div>
 				</div>
 			</div>
@@ -163,8 +164,8 @@
 						<div style="flex:1"><div style="font-weight:500">Restore from file</div><div class="txt-sm">choose a Buffy .json backup</div></div>
 					</div>
 					<div style="display:flex;gap:9px">
-						<button class="btn btn-ghost btn-sm" style="flex:1" onclick={() => pick('merge')}><Icon name="swap" size={16} />Merge</button>
-						<button class="btn btn-ghost btn-sm" style="flex:1;border-color:var(--warn);color:var(--warn)" onclick={() => pick('replace')}><Icon name="upload" size={16} color="var(--warn)" />Replace</button>
+						<Button size="medium" variant="bordered" style="flex:1" onclick={() => pick('merge')}><Icon name="swap" size={16} />Merge</Button>
+						<Button size="medium" variant="bordered" style="flex:1;border-color:var(--warn);color:var(--warn)" onclick={() => pick('replace')}><Icon name="upload" size={16} color="var(--warn)" />Replace</Button>
 					</div>
 				</div>
 				<div class="txt-sm" style="display:flex;gap:7px;align-items:flex-start;padding-inline:2px">
@@ -181,13 +182,9 @@
 	</div>
 
 	{#if pending}
-		<button
-			style="position:absolute;inset:0;background:rgba(20,16,12,0.4);z-index:40;border:none"
-			aria-label="Cancel"
-			onclick={() => (pending = null)}
-		></button>
-		<div style="position:absolute;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-radius:24px 24px 0 0;padding:22px 20px calc(30px + env(safe-area-inset-bottom,0));box-shadow:0 -10px 40px rgba(0,0,0,0.2)">
-			<div style="width:40px;height:4px;border-radius:99px;background:var(--line);margin:0 auto 18px"></div>
+		<button class="sheet-backdrop" aria-label="Cancel" onclick={() => (pending = null)}></button>
+		<div class="sheet">
+			<div class="sheet-grip"></div>
 			<span class="stat-ic" style="width:46px;height:46px;background:var(--warn-tint);margin-bottom:14px"><Icon name="alert" size={24} color="var(--warn)" /></span>
 			<div class="h-card" style="font-size:19px;margin-bottom:6px">Replace all data?</div>
 			<div class="txt" style="margin-bottom:14px">
@@ -203,8 +200,8 @@
 				<span class="txt-sm" style="color:var(--ink)">Export a backup of current data first</span>
 			</label>
 			<div style="display:flex;gap:10px">
-				<button class="btn btn-ghost" style="flex:1" onclick={() => (pending = null)} disabled={busy}>Cancel</button>
-				<button class="btn" style="flex:1.3;background:var(--warn);color:#fff" onclick={confirmReplace} disabled={busy}>{busy ? 'Working…' : 'Replace'}</button>
+				<Button variant="bordered" style="flex:1" onclick={() => (pending = null)} disabled={busy}>Cancel</Button>
+				<Button style="flex:1.3;background:var(--warn);color:#fff" onclick={confirmReplace} disabled={busy}>{busy ? 'Working…' : 'Replace'}</Button>
 			</div>
 		</div>
 	{/if}

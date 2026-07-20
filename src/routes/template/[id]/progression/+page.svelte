@@ -10,6 +10,7 @@
 	import { kg } from '$lib/format';
 	import type { Template, Exercise } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
@@ -86,7 +87,7 @@
 		</div>
 	</div>
 	<div class="actionbar">
-		<button class="btn btn-ghost" style="flex:0;padding-inline:16px" onclick={() => goto('/settings')} aria-label="settings"><Icon name="cog" size={18} /></button>
-		<button class="btn btn-dark" style="flex:1" onclick={acceptStart}><Icon name="play" size={15} color="#fff" />Accept all &amp; Start</button>
+		<Button variant="bordered" style="flex:0" onclick={() => goto('/settings')} aria-label="settings"><Icon name="cog" size={18} /></Button>
+		<Button variant="dark" style="flex:1" onclick={acceptStart}><Icon name="play" size={15} color="#fff" />Accept all &amp; Start</Button>
 	</div>
 </div>
