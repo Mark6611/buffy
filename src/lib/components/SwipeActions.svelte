@@ -5,17 +5,43 @@
 		children,
 		actions,
 		actionsWidth = 152,
-		onOpen
-	}: { children: Snippet; actions: Snippet; actionsWidth?: number; onOpen?: () => void } = $props();
+		onOpen,
+		/** Mirrors the drawer's open state outward so a parent can drive
+		 *  aria-expanded on its own trigger. Bindable; do not write to it.
+		 *  No fallback on purpose — Svelte rejects binding an undefined value to a
+		 *  prop that declares one, and the parent's array starts empty. */
+		open = $bindable()
+	}: {
+		children: Snippet;
+		actions: Snippet;
+		actionsWidth?: number;
+		onOpen?: () => void;
+		open?: boolean;
+	} = $props();
 
 	let dragX = $state(0);
 	let dragging = $state(false);
 	let startX = 0;
 	let startDragX = 0;
 
+	// keep the mirrored flag in step however the drawer moved (drag OR toggle)
+	$effect(() => {
+		open = dragX < 0;
+	});
+
 	/** Snap shut — called by the parent on every other row when one opens. */
 	export function close() {
 		dragX = 0;
+	}
+
+	/** Open/close WITHOUT a gesture. `dragX` only ever goes negative from a pointer
+	 *  drag, so before this existed the actions were permanently inert: unreachable
+	 *  by VoiceOver, Switch Control and the keyboard. The parent renders a visible
+	 *  trigger and calls this. */
+	export function toggle() {
+		const wasOpen = dragX < 0;
+		dragX = wasOpen ? 0 : -actionsWidth;
+		if (!wasOpen) onOpen?.();
 	}
 
 	function onPointerDown(e: PointerEvent) {
@@ -56,13 +82,15 @@
 </script>
 
 <div class="swipe-wrap">
-	<!-- inert while closed: the buttons are clipped off-screen (still laid out under
-	     overflow:hidden), so without this they'd stay in the tab order and accessibility
-	     tree — reachable/announced even though nothing is visible there. -->
+	<!-- inert while closed so the hidden buttons stay out of the tab order and the
+	     accessibility tree. They are NOT clipped off-screen as previously claimed —
+	     .swipe-content is opaque and simply covers them — so inert is what actually
+	     hides them. Note inert is a no-op on iOS 15.0–15.4, where they are merely
+	     obscured. Safe to keep now that toggle() gives a non-gesture way in. -->
 	<div class="swipe-actions" inert={dragX >= 0}>{@render actions()}</div>
-	<!-- role="group": a drag-to-reveal gesture surface, not a single actionable control —
-	     screen-reader users reach the same actions directly via the (real, focusable)
-	     buttons rendered in the `actions` snippet, so no keyboard equivalent is added here. -->
+	<!-- role="group": a drag-to-reveal gesture surface, not a single actionable
+	     control. The gesture itself has no keyboard equivalent by design — the parent
+	     renders a visible trigger wired to toggle() instead. -->
 	<div
 		class="swipe-content"
 		role="group"

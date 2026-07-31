@@ -190,6 +190,8 @@
 	}
 
 	let swipeRefs: (SwipeActions | undefined)[] = $state([]);
+	// mirrors each row's drawer state so the overflow trigger can carry aria-expanded
+	let swipeOpen: boolean[] = $state([]);
 	function closeOtherSwipes(exIndex: number) {
 		swipeRefs.forEach((r, i) => {
 			if (i !== exIndex) r?.close();
@@ -293,7 +295,7 @@
 					{@const cardioDist = ex?.cardioMetric === 'distance'}
 					{@const sg = workout.suggestions[le.exerciseId]}
 					<div class="ex-block">
-						<SwipeActions bind:this={swipeRefs[exIndex]} actionsWidth={240} onOpen={() => closeOtherSwipes(exIndex)}>
+						<SwipeActions bind:this={swipeRefs[exIndex]} bind:open={swipeOpen[exIndex]} actionsWidth={240} onOpen={() => closeOtherSwipes(exIndex)}>
 							{#snippet children()}
 								<div class="ex-head">
 									<Thumb equip={ex?.equipment ?? 'dumbbell'} />
@@ -309,6 +311,18 @@
 											<span class="setup-note"><Icon name="cog" size={12} sw={2} />{le.setupNote}</span>
 										{/if}
 									</div>
+									<!-- The move/swap/delete drawer is otherwise gesture-only, i.e. absent for
+									     VoiceOver, Switch Control and keyboard users. stopPropagation keeps this
+									     tap out of the drag machinery underneath. -->
+									<button
+										class="icon-btn ghost"
+										aria-label="Actions for {ex?.name}"
+										aria-expanded={swipeOpen[exIndex] ?? false}
+										onpointerdown={(e) => e.stopPropagation()}
+										onclick={() => swipeRefs[exIndex]?.toggle()}
+									>
+										<Icon name="more" size={18} color="var(--ink-3)" />
+									</button>
 								</div>
 							{/snippet}
 							{#snippet actions()}

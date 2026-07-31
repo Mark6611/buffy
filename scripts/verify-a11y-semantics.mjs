@@ -93,6 +93,45 @@ check('set table itself is labelled', await page.evaluate(() => !!document.query
 check('rest timer has a polite live region', await page.locator('[aria-live="polite"]').count() > 0, `${await page.locator('[aria-live="polite"]').count()} live region(s); digits hidden: ${await page.evaluate(() => document.querySelector('.rest-time')?.getAttribute('aria-hidden') === 'true')}`);
 const removeBtn = await page.evaluate(() => [...document.querySelectorAll('button')].filter((b) => /remove (last )?set/i.test(b.getAttribute('aria-label') || b.textContent || '')).length);
 check('non-gesture "Remove set" exists', removeBtn > 0, `${removeBtn} button(s)`);
+// ── Phase 3: the move/swap/delete drawer must be reachable WITHOUT a drag
+const trigger = page.locator('button[aria-label^="Actions for"]').first();
+const hasTrigger = (await trigger.count()) > 0;
+check('overflow trigger exists on each row', hasTrigger, hasTrigger ? await trigger.getAttribute('aria-label') : 'MISSING');
+if (hasTrigger) {
+	const inertBefore = await page.evaluate(() => document.querySelector('.swipe-actions')?.hasAttribute('inert'));
+	check('drawer starts closed + inert', (await trigger.getAttribute('aria-expanded')) === 'false' && inertBefore === true, `aria-expanded=false, inert=${inertBefore}`);
+	await trigger.click();
+	await page.waitForTimeout(400);
+	const inertAfter = await page.evaluate(() => document.querySelector('.swipe-actions')?.hasAttribute('inert'));
+	const reachable = await page.evaluate(() => {
+		const d = document.querySelector('.swipe-actions');
+		if (!d || d.hasAttribute('inert')) return 0;
+		return [...d.querySelectorAll('button')].filter((b) => (b.getAttribute('aria-label') || b.textContent || '').trim()).length;
+	});
+	check('trigger opens the drawer and un-inerts it', inertAfter === false && (await trigger.getAttribute('aria-expanded')) === 'true', `aria-expanded=true, inert=${inertAfter}`);
+	check('all four actions become reachable', reachable >= 4, `${reachable} named action button(s) now in the tree`);
+	await trigger.click();
+	await page.waitForTimeout(400);
+	check('trigger closes it again', (await trigger.getAttribute('aria-expanded')) === 'false', 'toggles back shut');
+
+	// REGRESSION: the pointer drag is the sighted path and must be untouched by the
+	// bindable/toggle work. Drag past the halfway threshold and it must settle open.
+	// Start from mid-row, NOT the right edge: the overflow trigger lives there and
+	// deliberately stops propagation, so a drag begun on it is a tap by design.
+	const box = await page.locator('.swipe-content').first().boundingBox();
+	const y = box.y + 30;
+	await page.mouse.move(box.x + box.width * 0.45, y);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width * 0.45 - 180, y, { steps: 12 });
+	await page.mouse.up();
+	await page.waitForTimeout(450);
+	const dragOpened = await page.evaluate(() => document.querySelector('.swipe-actions')?.hasAttribute('inert') === false);
+	check('drag still opens the drawer (regression)', dragOpened, `inert=${!dragOpened}`);
+	check('drag keeps aria-expanded in sync', (await trigger.getAttribute('aria-expanded')) === 'true', 'mirrored state tracks the gesture too');
+	await trigger.click();
+	await page.waitForTimeout(300);
+}
+
 // icons must be decorative, not noise
 const iconsExposed = await page.evaluate(() => [...document.querySelectorAll('svg')].filter((s) => s.getAttribute('aria-hidden') !== 'true' && !s.getAttribute('aria-label') && s.getAttribute('role') !== 'img').length);
 check('icons are decorative (not AT noise)', iconsExposed === 0, `${iconsExposed} unlabelled svg(s) still exposed`);
