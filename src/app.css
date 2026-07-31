@@ -12,14 +12,27 @@
   --line: oklch(0.92 0.006 70); /* hairlines / borders */
   --line-soft: oklch(0.945 0.005 70);
 
-  /* ink */
+  /* ink — the ramp is spaced so that even the TERTIARY tone clears WCAG AA (4.5:1)
+     on every surface it actually lands on, including --accent-tint (the active set
+     row, the worst case). --ink-3 was 2.89:1 and carries ~84 .txt-sm sites, 19
+     .h-sec sites, the muted set-table columns and every chart axis label. */
   --ink: oklch(0.24 0.012 60); /* primary text */
-  --ink-2: oklch(0.52 0.012 60); /* secondary */
-  --ink-3: oklch(0.68 0.01 60); /* tertiary / placeholder */
+  --ink-2: oklch(0.44 0.012 60); /* secondary  — 7.8:1 on --surface */
+  --ink-3: oklch(0.52 0.01 60); /* tertiary   — 5.5:1 surface / 4.8:1 accent-tint */
+
+  /* Boundary tone for unfilled controls. --line is a decorative hairline (exempt);
+     this is for controls whose OUTLINE is the only thing conveying their state —
+     the off toggle track and the unchecked set circle, both 1.27:1 before. */
+  --control-line: oklch(0.62 0.006 70);
 
   /* accent — tangerine (Buffy's signature) */
   --accent: oklch(0.685 0.175 47);
-  --accent-press: oklch(0.61 0.165 45);
+  /* Tangerine is a 3.01:1 backdrop for white text, with no headroom to spend. It
+     stays the brand colour for strokes, borders and tint fills (3:1 is enough for
+     those), but anywhere WHITE TEXT sits on the fill uses --accent-solid (4.68:1).
+     --accent-press must stay DARKER than --accent-solid or the press cue inverts. */
+  --accent-solid: oklch(0.575 0.175 47);
+  --accent-press: oklch(0.5 0.165 45);
   --accent-tint: oklch(0.955 0.035 60); /* faint fill for active/done rows */
   --accent-ink: oklch(0.45 0.14 45); /* accent text on tint */
   /* sRGB channels of --accent, for rgb(… / alpha) tints. Kept alongside the oklch
@@ -28,7 +41,7 @@
   --accent-rgb: 226 112 58;
 
   /* states */
-  --warn: oklch(0.585 0.205 27); /* rest overage */
+  --warn: oklch(0.53 0.205 27); /* rest overage — 4.96:1 on --warn-tint */
   --warn-tint: oklch(0.955 0.04 30);
 
   --r-card: 22px;
@@ -355,7 +368,7 @@ a.chip:active {
 
 /* variants */
 .btn-accent {
-  background: var(--accent);
+  background: var(--accent-solid);
   color: #fff;
 } /* Bordered Prominent */
 .btn-accent:active {
@@ -628,7 +641,9 @@ a.chip:active {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 2px solid var(--line);
+  /* The unchecked circle is the app's most-repeated action and its ring is the
+     only thing identifying it — --line rendered it at 1.27:1. */
+  border: 2px solid var(--control-line);
   background: var(--surface);
   display: inline-flex;
   align-items: center;
@@ -653,6 +668,11 @@ a.chip:active {
 .row-active td:last-child {
   border-top-right-radius: 8px;
   border-bottom-right-radius: 8px;
+}
+/* On the ACTIVE row the circle sits on --accent-tint rather than white, where
+   --control-line falls just under 3:1 — borrow the accent's own ink there. */
+.row-active .setcheck {
+  border-color: var(--accent-ink);
 }
 
 .inp {
@@ -780,7 +800,7 @@ input.inp.rest-inp {
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: #fff;
-  background: var(--accent);
+  background: var(--accent-solid);
   padding: 3px 9px;
   border-radius: 99px;
 }
@@ -812,7 +832,7 @@ input.inp.rest-inp {
   gap: 14px;
 }
 .rest-banner.accent {
-  background: var(--accent);
+  background: var(--accent-solid);
 }
 .rest-banner.warn {
   background: var(--warn);
@@ -828,7 +848,6 @@ input.inp.rest-inp {
   font-size: 11px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  opacity: 0.7;
 }
 .rest-progress {
   height: 5px;
@@ -850,9 +869,14 @@ input.inp.rest-inp {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgb(255 255 255 / 0.18);
+  /* A white wash is self-defeating on a coloured banner: it lifts the BACKDROP
+     toward the white glyph. It read 2.5:1 at 0.18 and still only 4.0:1 thinned
+     to 0.10 — short of the 4.5:1 the 12px −15/+15 LABELS need (the pause/skip
+     glyphs only owe 3:1). A dark recess moves the backdrop the other way and
+     gets 5.9:1, with the specular rim left white to keep the glass read. */
+  background: rgb(0 0 0 / 0.12);
   color: #fff;
-  border: 1px solid rgb(255 255 255 / 0.22);
+  border: 1px solid rgb(255 255 255 / 0.7);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   display: flex;
@@ -874,7 +898,6 @@ input.inp.rest-inp {
   font-family: var(--font-mono);
   font-size: 12px;
   color: #fff;
-  opacity: 0.7;
   background: none;
   border: none;
   padding: 0;
@@ -938,12 +961,17 @@ input.inp.rest-inp {
   height: 28px;
   border-radius: 99px;
   background: var(--line);
+  /* The OFF track was 1.27:1 against its card — the control was effectively
+     invisible until switched on. Ring rather than a darker fill: it clears the
+     3:1 boundary rule without making an off switch read as a disabled one. */
+  box-shadow: inset 0 0 0 1px var(--control-line);
   position: relative;
   flex: 0 0 auto;
   cursor: pointer;
 }
 .toggle.on {
   background: var(--accent);
+  box-shadow: none; /* the filled track is its own boundary */
 }
 .toggle > i {
   position: absolute;

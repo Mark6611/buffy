@@ -61,7 +61,7 @@
 					{kg(latest.kg)} <span class="txt-sm" style="font-weight:500">kg</span>
 				</div>
 				{#if delta != null}
-					<div class="txt-sm" style="color:{delta <= 0 ? 'var(--accent)' : 'var(--ink-3)'}">
+					<div class="txt-sm" style="color:{delta <= 0 ? 'var(--accent-ink)' : 'var(--ink-2)'}">
 						{delta >= 0 ? '+' : ''}{kg(delta)} kg since {monthDay(entries[0].at)}
 					</div>
 				{/if}
