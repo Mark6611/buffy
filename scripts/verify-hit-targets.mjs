@@ -37,6 +37,16 @@ await page.evaluate(async () => {
 	await new Promise((res, rej) => {
 		const tx = db.transaction(st, 'readwrite'); for (const x of st) tx.objectStore(x).clear();
 		tx.objectStore('exercises').put({ id: 'b1', name: 'Bench', equipment: 'barbell', primaryMuscles: ['Chest'], secondaryMuscles: [], trackingType: 'weight_reps', loadType: 'total', defaultRestSec: 120, weightStep: 2.5, updatedAt: new Date().toISOString() });
+		tx.objectStore('exercises').put({ id: 'b2', name: 'Overhead Press', equipment: 'barbell', primaryMuscles: ['Shoulders'], secondaryMuscles: [], trackingType: 'weight_reps', loadType: 'total', defaultRestSec: 120, weightStep: 2.5, updatedAt: new Date().toISOString() });
+		// a SUPERSET template: the only place the "ungroup" chip renders
+		tx.objectStore('templates').put({
+			id: 'tpl-ss', name: 'Superset Day', groups: [{ id: 'g1', restSec: 120 }],
+			exercises: [
+				{ exerciseId: 'b1', groupId: 'g1', plannedSets: [{ targetReps: 8, targetWeight: 80, targetRestSec: 120 }] },
+				{ exerciseId: 'b2', groupId: 'g1', plannedSets: [{ targetReps: 8, targetWeight: 45, targetRestSec: 120 }] }
+			],
+			createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+		});
 		tx.objectStore('settings').put({ id: 'singleton', defaultRestSec: 120, autoProgression: true, increments: { barbell: 2.5, dumbbellPerSide: 1, machinePin: 5 }, hapticAtRestEnd: true, trackRpe: true, writeToHealth: false, readRecoveryFromHealth: false, cloudSyncEnabled: false });
 		tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
 	}); db.close();
@@ -107,6 +117,32 @@ await target('rest -15 / +15 ctrl', '.rest-ctrl', 44, 44);
 await target('rest seed button', '.rest-seed-btn', 40, 40);
 await target('Add set', '.tap-row', 44, 40);
 await target('.btn-rg (Finish)', '.btn-rg', 44, 44);
+
+console.log('— template editor (superset) —');
+await page.evaluate(() => localStorage.removeItem('buffy:activeWorkout'));
+await page.goto(base + '/template/tpl-ss/edit', { waitUntil: 'networkidle' });
+await page.waitForTimeout(900);
+await target('ungroup chip', 'button.chip.accent', 44, 44);
+// The band must NOT reach the exercise name above it: ungrouping a superset from a
+// stray tap on the title would be a destructive false positive.
+const nameSafe = await page.evaluate(() => {
+	const chip = document.querySelector('button.chip.accent');
+	const name = document.querySelector('.ex-name');
+	if (!chip || !name) return { err: 'not rendered' };
+	const cs = getComputedStyle(chip, '::after');
+	const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+	const cr = chip.getBoundingClientRect(), nr = name.getBoundingClientRect();
+	const bandTop = cr.top + num(cs.top) + num(getComputedStyle(chip).borderTopWidth);
+	// probe the very bottom of the name text — it must still belong to the name
+	const hit = document.elementFromPoint(nr.left + 4, nr.bottom - 1);
+	return { gap: +(bandTop - nr.bottom).toFixed(1), stolen: !!hit && chip.contains(hit) || hit === chip, hitName: hit ? (hit.className || hit.tagName) : 'null' };
+});
+if (nameSafe.err) { results.push(false); console.log(`✗ FAIL  ungroup/name clearance — ${nameSafe.err}`); }
+else {
+	const ok = nameSafe.gap >= 0 && !nameSafe.stolen;
+	results.push(ok);
+	console.log(`${ok ? '✓' : '✗ FAIL'}  band clears the exercise name  gap=${nameSafe.gap}px, name-bottom hits "${nameSafe.hitName}"`);
+}
 
 // no two expanded areas may claim the same point
 console.log('— overlap —');

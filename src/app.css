@@ -305,11 +305,6 @@ button.chip:active,
 a.chip:active {
   transform: scale(0.94);
 }
-/* Opt-out for a tappable chip living INSIDE dense content (a badge that happens
-   to be a control), where the Small rung would break the surrounding rhythm. */
-.chip.chip-inline {
-  min-height: 0;
-}
 .chip.solid {
   background: var(--ink);
   color: #fff;
@@ -1148,15 +1143,16 @@ button.setcheck::after {
   top: -8px;
   bottom: -10px; /* 28 -> 44 tall, clearing the 2px UA button border */
 }
-/* .chip-inline is excluded on purpose: the superset "ungroup" chip sits 3px under
-   the exercise name, so a band above it would fire ungroup on a name tap — worse
-   than a small target. It needs a visual size decision instead. */
-button.chip:not(.chip-inline),
-a.chip:not(.chip-inline) {
+/* Every interactive chip, with no exceptions: the one chip that used to opt out
+   (the superset "ungroup" badge) is now full size with enough margin above it that
+   this band cannot reach the exercise name. Any future dense chip must earn its
+   clearance the same way rather than opting out of a 44pt target. */
+button.chip,
+a.chip {
   position: relative;
 }
-button.chip:not(.chip-inline)::after,
-a.chip:not(.chip-inline)::after {
+button.chip::after,
+a.chip::after {
   content: "";
   position: absolute;
   left: -4px;

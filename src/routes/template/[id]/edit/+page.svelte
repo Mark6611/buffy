@@ -64,8 +64,11 @@
 								<div style="flex:1;min-width:0">
 									<div class="ex-name" style="font-size:14px">{ex?.name}</div>
 									{#if te.groupId}
-										<button class="chip accent chip-inline" style="font-size:10px;padding:2px 7px;margin-top:3px" onclick={() => editor.ungroup(te.groupId!)}>
-											<Icon name="link" size={10} color="var(--accent-ink)" sw={2.2} />Superset · ungroup
+										<!-- A full-size chip, not a dense badge: this ungroups a superset, so it
+										     needs a real target. margin-top gives its hit expansion room to reach
+										     44pt without the band reaching the exercise name above it. -->
+										<button class="chip accent" style="margin-top:8px" onclick={() => editor.ungroup(te.groupId!)}>
+											<Icon name="link" size={13} color="var(--accent-ink)" sw={2.2} />Superset · ungroup
 										</button>
 									{/if}
 								</div>
