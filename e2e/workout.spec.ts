@@ -15,7 +15,7 @@ test('template → log a set → rest → finish → history', async ({ page }) 
 	await expect(page).toHaveURL(/\/workout/);
 
 	// log the first set → rest banner appears
-	await page.locator('button[aria-label="toggle set"]').first().click();
+	await page.getByRole('checkbox').first().click();
 	await expect(page.locator('.rest-banner')).toBeVisible();
 	await expect(page.locator('tr.row-done')).toHaveCount(1);
 
@@ -34,7 +34,7 @@ test('finishing a template workout can push edited weights back to the template'
 	// bump the first set's weight, then log it (row order: reps input, then weight input)
 	const firstRow = page.locator('.ex-block').first().locator('tbody tr').first();
 	await firstRow.locator('input[type="number"]').last().fill('16');
-	await page.locator('button[aria-label="toggle set"]').first().click();
+	await page.getByRole('checkbox').first().click();
 
 	await page.getByRole('button', { name: 'Finish' }).click();
 	await page.getByRole('button', { name: 'Update weights only' }).click();
@@ -53,7 +53,7 @@ test('a quick-log workout can be saved as a new template', async ({ page }) => {
 	await page.getByRole('button', { name: /Add exercise/ }).click();
 	await page.getByRole('button', { name: /Dumbbell Bicep Curl/ }).click();
 	await expect(page).toHaveURL(/\/workout/);
-	await page.locator('button[aria-label="toggle set"]').first().click();
+	await page.getByRole('checkbox').first().click();
 
 	await page.getByRole('button', { name: 'Finish' }).click();
 	await expect(page.getByText('Save as a template?')).toBeVisible();
@@ -68,7 +68,9 @@ test('a quick-log workout can be saved as a new template', async ({ page }) => {
 async function swipeOpen(page: import('@playwright/test').Page, rowLocator: import('@playwright/test').Locator) {
 	const box = await rowLocator.boundingBox();
 	if (!box) throw new Error('swipe row not found');
-	const startX = box.x + box.width - 20;
+	// mid-row, not the right edge: the overflow trigger lives there and stops
+	// pointer propagation, so a drag started on it is deliberately a tap
+	const startX = box.x + box.width * 0.5;
 	const y = box.y + box.height / 2;
 	await page.mouse.move(startX, y);
 	await page.mouse.down();
@@ -113,7 +115,7 @@ test('an in-progress workout resumes after a reload', async ({ page }) => {
 	await page.getByRole('button', { name: /Legs/ }).first().click();
 	await page.getByRole('button', { name: 'Start', exact: true }).click();
 	await expect(page).toHaveURL(/\/workout/);
-	await page.locator('button[aria-label="toggle set"]').first().click();
+	await page.getByRole('checkbox').first().click();
 	await expect(page.locator('tr.row-done')).toHaveCount(1);
 
 	// hard reload — the app should restore the session and land back in /workout
@@ -206,6 +208,6 @@ test('the rest timer starts even when logging out of the superset round order', 
 
 	// log the SECOND set of the first exercise (out of round order)
 	const firstBlock = page.locator('.ex-block').first();
-	await firstBlock.locator('button[aria-label="toggle set"]').nth(1).click();
+	await firstBlock.getByRole('checkbox').nth(1).click();
 	await expect(page.locator('.rest-banner')).toBeVisible();
 });
