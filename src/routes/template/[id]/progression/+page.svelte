@@ -83,7 +83,7 @@
 					</div>
 				{/each}
 			</div>
-			<div style="height:110px"></div>
+			<div class="actionbar-clear"></div>
 		</div>
 	</div>
 	<div class="actionbar">

@@ -59,10 +59,10 @@
 	</div>
 	<div class="screen-body">
 		<div class="pad" style="margin-bottom:12px">
-			<div class="search" style="margin-bottom:12px">
+			<label class="search" style="margin-bottom:12px">
 				<Icon name="search" size={18} color="var(--ink-3)" />
-				<input style="border:none;background:transparent;outline:none;flex:1;font-size:15px;color:var(--ink)" placeholder="Search exercises…" bind:value={q} />
-			</div>
+				<input style="border:none;background:transparent;flex:1;font-size:15px;color:var(--ink)" placeholder="Search exercises…" bind:value={q} />
+			</label>
 			<div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px">
 				{#each filters as f (f)}
 					<button class="chip {filter === f ? 'solid' : ''}" style="flex:0 0 auto" onclick={() => (filter = f)}>{f}</button>

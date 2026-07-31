@@ -31,11 +31,11 @@
 
 	<div class="screen-body">
 		{#if draft}
-			<div class="pad" style="padding-bottom:120px">
+			<div class="pad" style="padding-bottom:var(--actionbar-clear)">
 				<div class="txt-sm" style="margin-bottom:6px">NAME</div>
 				<input
 					class="h-app"
-					style="font-size:24px;width:100%;border:none;border-bottom:2px solid var(--accent);background:transparent;outline:none;padding-bottom:8px;margin-bottom:18px"
+					style="font-size:24px;width:100%;border:none;border-bottom:2px solid var(--accent);background:transparent;padding-bottom:8px;margin-bottom:18px"
 					bind:value={draft.name}
 				/>
 

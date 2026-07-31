@@ -98,9 +98,9 @@
 	<div class="screen-body">
 		<div class="pad" style="padding-bottom:28px">
 			<div class="txt-sm" style="margin:6px 0 6px">NAME</div>
-			<div class="search" style="margin-bottom:16px">
-				<input style="border:none;background:transparent;outline:none;flex:1;font-size:15px;color:var(--ink)" placeholder="Exercise name" bind:value={name} />
-			</div>
+			<label class="search" style="margin-bottom:16px">
+				<input style="border:none;background:transparent;flex:1;font-size:15px;color:var(--ink)" placeholder="Exercise name" bind:value={name} />
+			</label>
 
 			<div class="txt-sm" style="margin-bottom:8px">EQUIPMENT</div>
 			<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px">
@@ -155,7 +155,7 @@
 					<select
 						bind:value={muscle}
 						aria-label="Primary muscle"
-						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px"
+						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;-webkit-appearance:none;appearance:none"
 					>
 						<option value="">No primary muscle</option>
 						{#each MUSCLES as m (m)}<option value={m}>{m}</option>{/each}

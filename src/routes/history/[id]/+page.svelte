@@ -165,7 +165,7 @@
 					<Icon name="note" size={18} color="var(--ink-3)" />
 					<textarea
 						class="txt"
-						style="flex:1;border:none;background:transparent;resize:none;font-family:var(--font-ui);outline:none"
+						style="flex:1;border:none;background:transparent;resize:none;font-family:var(--font-ui)"
 						rows="2"
 						placeholder="Add a note…"
 						bind:value={s.note}

@@ -119,7 +119,7 @@
 						{/if}
 					{/each}
 				</div>
-				<div style="height:96px"></div>
+				<div class="actionbar-clear"></div>
 			</div>
 		{/if}
 	</div>

@@ -77,7 +77,7 @@
 					<select
 						bind:value={selectedId}
 						aria-label="Choose exercise"
-						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px"
+						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;-webkit-appearance:none;appearance:none"
 					>
 						{#each logged as e (e.id)}<option value={e.id}>{e.name}</option>{/each}
 					</select>

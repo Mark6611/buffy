@@ -475,6 +475,20 @@ a.chip:active {
   border-top: 1px solid rgb(255 255 255 / 0.7);
 }
 
+/* Scroll clearance for a screen that carries an .actionbar. Because the bar is a
+   true overlay, content scrolls UNDER it and the page has to reserve its height at
+   the end of the scroll region. Derived from the bar above — 14px top padding + a
+   52px .btn + 26px bottom padding — plus the home-indicator inset and a little
+   breathing room. Kept as a token because the three call sites previously hard-coded
+   96/110/120px and omitted env(): the bar is 126px on a notched iPhone, so the last
+   row was occluded by up to 30px on every device with a home indicator. */
+:root {
+  --actionbar-clear: calc(104px + env(safe-area-inset-bottom, 0px));
+}
+.actionbar-clear {
+  height: var(--actionbar-clear);
+}
+
 /* Bottom sheet — also a true overlay. Carries more opacity than the action bar
    because body text has to stay legible over whatever it covers. */
 .sheet {
