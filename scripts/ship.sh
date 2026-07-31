@@ -96,7 +96,10 @@ proj.targets.each do |t|
 end
 proj.save
 puts n' "$BUILD_NUM" "$ASC_MAX")
-echo "   building 1.0 ($BUILD_NUM)"
+# read the real marketing version rather than printing a hardcoded one — it said
+# "1.0" for every ship since 1.0, which misreports what is actually going out
+MARKETING=$(grep -m1 -E 'MARKETING_VERSION = ' "$PBXPROJ" | sed 's/.*= *//;s/;.*//')
+echo "   building $MARKETING ($BUILD_NUM)"
 
 echo "══ Web bundle + native sync"
 npm run ios:sync > /tmp/ship-iossync.log 2>&1
@@ -183,4 +186,4 @@ git commit -q -m "Build $BUILD_NUM" && git push -q origin main \
 	&& echo "   committed + pushed the build $BUILD_NUM bump" \
 	|| echo "   WARN: could not auto-commit/push the bump — commit $PBXPROJ manually."
 
-echo "══ DONE: 1.0 ($BUILD_NUM) shipped, assigned, and the bump is committed."
+echo "══ DONE: $MARKETING ($BUILD_NUM) shipped, assigned, and the bump is committed."
