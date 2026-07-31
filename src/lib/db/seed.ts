@@ -433,9 +433,26 @@ function buildSessions(
 // updatedAt); on the empty DB the seed runs against, those always write.
 const SEED_EPOCH = "2000-01-01T00:00:00.000Z";
 
+/** Marks a seed that ran to COMPLETION. The old guard — "are there any exercises?"
+ *  — was true as soon as the first of three write phases finished, so a reload or
+ *  app kill mid-seed left the catalog populated but the templates and sample
+ *  sessions permanently missing: every later launch short-circuited on that guard.
+ *  Re-running the seed is safe, so the fast path is allowed to be wrong-but-rare in
+ *  only one direction (re-run), never in the other (skip an unfinished seed). */
+const SEED_DONE_KEY = "buffy:seeded:v1";
+
 export async function seedDatabase(repo: Repository): Promise<void> {
-  const existing = await repo.listExercises();
-  if (existing.length > 0) return; // already seeded
+  try {
+    if (typeof localStorage !== "undefined" && localStorage.getItem(SEED_DONE_KEY))
+      return;
+  } catch {
+    /* storage unavailable — fall through and re-run, which is harmless */
+  }
+
+  // Everything below is written through applySynced*, which only writes a record
+  // that is strictly NEWER than what is stored. With SEED_EPOCH that means a
+  // re-run fills in whatever is missing while never resurrecting a template the
+  // user deleted (its tombstone is newer) and never clobbering an edit.
 
   for (const e of EXERCISES)
     await repo.applySyncedExercise({ ...e, updatedAt: SEED_EPOCH });
@@ -452,4 +469,12 @@ export async function seedDatabase(repo: Repository): Promise<void> {
     new Map(EXERCISES.map((e) => [e.id, e]))
   ))
     await repo.applySyncedSession({ ...s, updatedAt: SEED_EPOCH });
+
+  // Only now is the seed complete. Set last, so an interrupted run is retried.
+  try {
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(SEED_DONE_KEY, "1");
+  } catch {
+    /* storage unavailable — the next launch simply re-runs the seed */
+  }
 }
