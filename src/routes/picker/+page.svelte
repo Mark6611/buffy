@@ -63,9 +63,9 @@
 				<Icon name="search" size={18} color="var(--ink-3)" />
 				<input style="border:none;background:transparent;flex:1;font-size:15px;color:var(--ink)" placeholder="Search exercises…" bind:value={q} />
 			</label>
-			<div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px">
+			<div role="group" aria-label="Equipment filter" style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px">
 				{#each filters as f (f)}
-					<button class="chip {filter === f ? 'solid' : ''}" style="flex:0 0 auto" onclick={() => (filter = f)}>{f}</button>
+					<button class="chip {filter === f ? 'solid' : ''}" style="flex:0 0 auto" aria-pressed={filter === f} onclick={() => (filter = f)}>{f}</button>
 				{/each}
 			</div>
 		</div>

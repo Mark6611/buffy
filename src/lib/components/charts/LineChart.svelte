@@ -3,9 +3,15 @@
 		series,
 		labels,
 		w = 358,
-		h = 180
-	}: { series: { data: number[]; color: string; dash?: boolean }[]; labels: string[]; w?: number; h?: number } =
-		$props();
+		h = 180,
+		label = 'Line chart'
+	}: {
+		series: { data: number[]; color: string; dash?: boolean }[];
+		labels: string[];
+		w?: number;
+		h?: number;
+		label?: string;
+	} = $props();
 
 	const padL = 32,
 		padB = 22,
@@ -20,7 +26,7 @@
 	const y = (v: number) => padT + innerH - ((v - min) / (max - min || 1)) * innerH;
 </script>
 
-<svg viewBox="0 0 {w} {h}" width="100%" style="display:block">
+<svg viewBox="0 0 {w} {h}" width="100%" style="display:block" role="img" aria-label={label}>
 	{#each [0, 0.5, 1] as f, i (i)}
 		{@const val = min + (max - min) * f}
 		{@const gy = y(val)}

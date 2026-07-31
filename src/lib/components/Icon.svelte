@@ -7,8 +7,17 @@
 		sw = 1.9,
 		color = 'currentColor',
 		fill = 'none',
-		style = ''
-	}: { name: IconName; size?: number; sw?: number; color?: string; fill?: string; style?: string } = $props();
+		style = '',
+		label
+	}: {
+		name: IconName;
+		size?: number;
+		sw?: number;
+		color?: string;
+		fill?: string;
+		style?: string;
+		label?: string;
+	} = $props();
 
 	const solid = $derived(SOLID_ICONS.has(name));
 </script>
@@ -23,6 +32,10 @@
 	stroke-width={sw}
 	stroke-linecap="round"
 	stroke-linejoin="round"
+	aria-hidden={label ? undefined : 'true'}
+	role={label ? 'img' : undefined}
+	aria-label={label}
+	focusable="false"
 >
 	<path d={ICONS[name]} />
 </svg>

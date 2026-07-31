@@ -50,7 +50,7 @@
 			<div class="card" style="margin-bottom:16px">
 				<div class="row" style="justify-content:space-between">
 					<div><div style="font-weight:600">Auto-progression</div><div class="txt-sm">+1 step when you beat target reps</div></div>
-					<button class="toggle {settings.current.autoProgression ? 'on' : ''}" aria-label="toggle" onclick={() => settings.save({ autoProgression: !settings.current.autoProgression })}><i></i></button>
+					<button class="toggle {settings.current.autoProgression ? 'on' : ''}" role="switch" aria-checked={settings.current.autoProgression} aria-label="Auto-progression" onclick={() => settings.save({ autoProgression: !settings.current.autoProgression })}><i></i></button>
 				</div>
 			</div>
 

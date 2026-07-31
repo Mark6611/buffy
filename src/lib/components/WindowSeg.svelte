@@ -8,11 +8,12 @@
 	];
 </script>
 
-<div class="seg" style="width:{width}px">
+<div class="seg" style="width:{width}px" role="group" aria-label="Time window">
 	{#each opts as o (o.k)}
 		<button
 			class={value === o.k ? 'on' : ''}
 			style="font-family:var(--font-mono);font-size:12px"
+			aria-pressed={value === o.k}
 			onclick={() => (value = o.k)}>{o.l}</button
 		>
 	{/each}

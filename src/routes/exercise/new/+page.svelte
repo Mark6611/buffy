@@ -103,9 +103,9 @@
 			</label>
 
 			<div class="txt-sm" style="margin-bottom:8px">EQUIPMENT</div>
-			<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px">
+			<div role="group" aria-label="Equipment" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px">
 				{#each equips as e (e)}
-					<button class="chip {equipment === e ? 'solid' : ''}" onclick={() => (equipment = e)}>
+					<button class="chip {equipment === e ? 'solid' : ''}" aria-pressed={equipment === e} onclick={() => (equipment = e)}>
 						<Icon name={EQUIP_ICON[e]} size={13} sw={1.8} color={equipment === e ? '#fff' : 'currentColor'} />
 						<span class="chip-eq">{equipLabel(e)}</span>
 					</button>
@@ -113,13 +113,15 @@
 			</div>
 
 			<div class="txt-sm" style="margin-bottom:8px">TRACKING TYPE</div>
-			<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+			<div role="radiogroup" aria-label="Tracking type" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
 				{#each tts as o (o.v)}
 					<button
 						style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;text-align:left;background:{trackingType === o.v ? 'var(--accent-tint)' : 'var(--surface)'};border:1.5px solid {trackingType === o.v ? 'var(--accent)' : 'var(--line)'}"
+						role="radio"
+						aria-checked={trackingType === o.v}
 						onclick={() => (trackingType = o.v)}
 					>
-						<span class="setcheck {trackingType === o.v ? 'done' : ''}" style="width:22px;height:22px">
+						<span class="setcheck {trackingType === o.v ? 'done' : ''}" style="width:22px;height:22px" aria-hidden="true">
 							{#if trackingType === o.v}<Icon name="check" size={13} sw={2.6} color="#fff" />{/if}
 						</span>
 						<div style="flex:1"><div style="font-weight:600;font-size:14.5px">{o.t}</div><div class="txt-sm">{o.s}</div></div>
@@ -129,21 +131,21 @@
 
 			{#if trackingType === 'cardio'}
 				<div class="txt-sm" style="margin-bottom:8px">CARDIO METRIC</div>
-				<div style="display:flex;gap:8px;margin-bottom:16px">
-					<button class="chip {cardioMetric === 'distance' ? 'solid' : ''}" style="flex:1;justify-content:center;height:38px" onclick={() => (cardioMetric = 'distance')}>Distance + time</button>
-					<button class="chip {cardioMetric === 'speed' ? 'solid' : ''}" style="flex:1;justify-content:center;height:38px" onclick={() => (cardioMetric = 'speed')}>Speed + incline</button>
+				<div role="group" aria-label="Cardio metric" style="display:flex;gap:8px;margin-bottom:16px">
+					<button class="chip {cardioMetric === 'distance' ? 'solid' : ''}" style="flex:1;justify-content:center;height:38px" aria-pressed={cardioMetric === 'distance'} onclick={() => (cardioMetric = 'distance')}>Distance + time</button>
+					<button class="chip {cardioMetric === 'speed' ? 'solid' : ''}" style="flex:1;justify-content:center;height:38px" aria-pressed={cardioMetric === 'speed'} onclick={() => (cardioMetric = 'speed')}>Speed + incline</button>
 				</div>
 			{/if}
 
 			<div class="card">
 				<div class="row" style="justify-content:space-between">
 					<div><div style="font-weight:500">Per-side load (kg ×2)</div><div class="txt-sm">dumbbell / unilateral cable</div></div>
-					<button class="toggle {perSide ? 'on' : ''}" aria-label="toggle" onclick={() => (perSide = !perSide)}><i></i></button>
+					<button class="toggle {perSide ? 'on' : ''}" role="switch" aria-checked={perSide} aria-label="Per-side load" onclick={() => (perSide = !perSide)}><i></i></button>
 				</div>
 				<div class="divider"></div>
 				<div class="row" style="justify-content:space-between">
 					<div style="font-weight:500">Default rest</div>
-					<input class="inp" type="text" style="width:64px" value={mmss(restSec)} onchange={(e) => (restSec = parseMmss(e.currentTarget.value))} />
+					<input class="inp" type="text" style="width:64px" aria-label="Default rest" value={mmss(restSec)} onchange={(e) => (restSec = parseMmss(e.currentTarget.value))} />
 				</div>
 				<div class="divider"></div>
 				<div class="row" style="justify-content:space-between;position:relative">

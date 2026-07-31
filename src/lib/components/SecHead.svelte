@@ -5,7 +5,7 @@
 </script>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 10px">
-	<span class="h-sec">{@render children?.()}</span>
+	<h2 class="h-sec">{@render children?.()}</h2>
 	{#if link}
 		<button
 			class="txt-sm"

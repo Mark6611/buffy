@@ -77,7 +77,7 @@
 						</button>
 					{/if}
 				</div>
-				<div class="h-app" style="font-size:28px">Workouts</div>
+				<h1 class="h-app" style="font-size:28px">Workouts</h1>
 			</div>
 			<div style="display:flex;gap:8px">
 				<button class="icon-btn" onclick={() => goto('/trends')} aria-label="Trends">
@@ -142,7 +142,7 @@
 						<div style="font-size:13px;font-weight:600">This week</div>
 						<div class="txt-sm mono" style="margin-top:2px">
 							{k.sessionsThisWeek} sessions · {volK(k.volThisWeek)} kg{#if k.streakDays > 0}
-								· <span style="color:var(--accent-ink)">🔥 {k.streakDays}-day streak</span>{/if}
+								· <span style="color:var(--accent-ink)"><span aria-hidden="true">🔥</span> {k.streakDays}-day streak</span>{/if}
 						</div>
 					</div>
 					<span class="chip" style="font-size:11px">Trends<Icon name="chevR" size={13} /></span>

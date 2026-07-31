@@ -30,7 +30,7 @@
 		<div style="display:flex;align-items:flex-end;justify-content:space-between;padding:8px 20px 14px">
 			<div>
 				<div class="txt-sm" style="margin-bottom:2px">{sessions.length} sessions</div>
-				<div class="h-app" style="font-size:28px">History</div>
+				<h1 class="h-app" style="font-size:28px">History</h1>
 			</div>
 			<button class="icon-btn" onclick={() => goto('/')} aria-label="Home"><Icon name="back" size={18} /></button>
 		</div>

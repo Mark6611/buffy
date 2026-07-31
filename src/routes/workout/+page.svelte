@@ -155,6 +155,10 @@
 		}
 		finalizeSync();
 	}
+	// the sync sheet is modal — move focus into it so VoiceOver/keyboard land inside
+	function autofocusNode(n: HTMLElement) {
+		n.focus();
+	}
 	function close() {
 		if (confirm('Discard this workout? Nothing will be saved.')) {
 			workout.cancel();
@@ -257,7 +261,7 @@
 
 {#snippet restCell(exIndex: number, s: number, set: LoggedSet)}
 	<td class={set.completed ? '' : 'muted'}>
-		{#if set.completed}{set.restTakenSec != null ? mmss(set.restTakenSec) : '—'}{:else if s === 0}—{:else}<input class="inp rest-inp" type="text" value={mmss(workout.plannedRest[exIndex]?.[s] ?? 0)} onchange={(e) => workout.setPlannedRest(exIndex, s, parseMmss(e.currentTarget.value))} />{/if}
+		{#if set.completed}{set.restTakenSec != null ? mmss(set.restTakenSec) : '—'}{:else if s === 0}—{:else}<input class="inp rest-inp" type="text" aria-label="Set {s + 1} planned rest" value={mmss(workout.plannedRest[exIndex]?.[s] ?? 0)} onchange={(e) => workout.setPlannedRest(exIndex, s, parseMmss(e.currentTarget.value))} />{/if}
 	</td>
 {/snippet}
 
@@ -321,18 +325,18 @@
 							{/snippet}
 						</SwipeActions>
 
-						<table class="settable">
+						<table class="settable" aria-label="{ex?.name} sets">
 							<thead>
 								{#if tt === 'cardio'}
 									{#if cardioDist}
-										<tr><th class="c" style="width:34px"></th><th class="l" style="width:34px">Set</th><th>Time</th><th>Meters</th><th>/500m</th></tr>
+										<tr><th scope="col" class="c" style="width:34px"></th><th scope="col" class="l" style="width:34px">Set</th><th scope="col">Time</th><th scope="col">Meters</th><th scope="col">/500m</th></tr>
 									{:else}
-										<tr><th class="c" style="width:34px"></th><th class="l" style="width:34px">Set</th><th>Time</th><th>Incline</th><th>Speed</th></tr>
+										<tr><th scope="col" class="c" style="width:34px"></th><th scope="col" class="l" style="width:34px">Set</th><th scope="col">Time</th><th scope="col">Incline</th><th scope="col">Speed</th></tr>
 									{/if}
 								{:else if tt === 'time_hold'}
-									<tr><th class="c" style="width:34px"></th><th class="l" style="width:38px">Set</th><th>Rest</th><th>Hold</th></tr>
+									<tr><th scope="col" class="c" style="width:34px"></th><th scope="col" class="l" style="width:38px">Set</th><th scope="col">Rest</th><th scope="col">Hold</th></tr>
 								{:else}
-									<tr><th class="c" style="width:34px"></th><th class="l" style="width:38px">Set</th><th>Rest</th><th>Reps</th>{#if !bw}<th style="width:{perSide ? 74 : 58}px">kg{#if perSide}<span class="col-x2"> ×2</span>{/if}</th>{/if}{#if settings.current.trackRpe}<th style="width:44px">RPE</th>{/if}</tr>
+									<tr><th scope="col" class="c" style="width:34px"></th><th scope="col" class="l" style="width:38px">Set</th><th scope="col">Rest</th><th scope="col">Reps</th>{#if !bw}<th scope="col" style="width:{perSide ? 74 : 58}px">kg{#if perSide}<span class="col-x2"> ×2</span>{/if}</th>{/if}{#if settings.current.trackRpe}<th scope="col" style="width:44px">RPE</th>{/if}</tr>
 								{/if}
 							</thead>
 							<tbody>
@@ -347,7 +351,7 @@
 										onpointercancel={setRowPointerCancel}
 									>
 										<td class="c">
-											<button class="setcheck {set.completed ? 'done' : ''}" onclick={() => workout.toggleSet(exIndex, s)} aria-label="toggle set">
+											<button class="setcheck {set.completed ? 'done' : ''}" onclick={() => workout.toggleSet(exIndex, s)} role="checkbox" aria-checked={set.completed} aria-label="Set {s + 1} of {ex?.name} complete">
 												{#if set.completed}<Icon name="check" size={14} sw={2.6} color="#fff" />{/if}
 											</button>
 										</td>
@@ -355,38 +359,52 @@
 
 										{#if tt === 'cardio'}
 											{#if cardioDist}
-												<td><input class="inp" type="text" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
-												<td><input class="inp" type="number" inputmode="numeric" value={set.distanceMeters ?? ''} oninput={(e) => (set.distanceMeters = numOrUndef(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="text" aria-label="Set {s + 1} time" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" inputmode="numeric" aria-label="Set {s + 1} meters" value={set.distanceMeters ?? ''} oninput={(e) => (set.distanceMeters = numOrUndef(e.currentTarget.value))} /></td>
 												<td class="muted">{cardioSplit500Sec(set) != null ? mmss(cardioSplit500Sec(set)!) : '—'}</td>
 											{:else}
-												<td><input class="inp" type="text" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
-												<td><input class="inp" type="number" value={set.incline ?? ''} oninput={(e) => (set.incline = numOrUndef(e.currentTarget.value))} /></td>
-												<td><input class="inp" type="number" value={set.speed ?? ''} oninput={(e) => (set.speed = numOrUndef(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="text" aria-label="Set {s + 1} time" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" aria-label="Set {s + 1} incline" value={set.incline ?? ''} oninput={(e) => (set.incline = numOrUndef(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" aria-label="Set {s + 1} speed" value={set.speed ?? ''} oninput={(e) => (set.speed = numOrUndef(e.currentTarget.value))} /></td>
 											{/if}
 										{:else if tt === 'time_hold'}
 											{@render restCell(exIndex, s, set)}
-											<td><input class="inp" type="text" value={mmss(set.durationSec ?? 0)} onchange={(e) => (set.durationSec = parseMmss(e.currentTarget.value))} /></td>
+											<td><input class="inp" type="text" aria-label="Set {s + 1} hold time" value={mmss(set.durationSec ?? 0)} onchange={(e) => (set.durationSec = parseMmss(e.currentTarget.value))} /></td>
 										{:else}
 											{@render restCell(exIndex, s, set)}
-											<td><input class="inp" type="number" value={set.reps ?? ''} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} /></td>
+											<td><input class="inp" type="number" aria-label="Set {s + 1} reps" value={set.reps ?? ''} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} /></td>
 											{#if !bw}
-												<td><input class="inp" type="number" step="0.5" value={set.weight ?? ''} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" step="0.5" aria-label="Set {s + 1} weight in kilograms" value={set.weight ?? ''} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} /></td>
 											{/if}
 											{#if settings.current.trackRpe}
-												<td><input class="inp" type="number" step="0.5" min="6" max="10" inputmode="decimal" value={set.rpe ?? ''} oninput={(e) => (set.rpe = numOrUndef(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="number" step="0.5" min="6" max="10" inputmode="decimal" aria-label="Set {s + 1} RPE" value={set.rpe ?? ''} oninput={(e) => (set.rpe = numOrUndef(e.currentTarget.value))} /></td>
 											{/if}
 										{/if}
 									</tr>
 								{/each}
 							</tbody>
 						</table>
-						<button
-							class="txt-sm"
-							style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
-							onclick={() => workout.addSet(exIndex)}
-						>
-							<Icon name="plus" size={13} sw={2.2} color="var(--ink-3)" />Add set
-						</button>
+						<!-- Remove mirrors the Add/Remove pair in the template editor: the swipe
+						     gesture on a set row stays the sighted shortcut, but it is unreachable
+						     by VoiceOver/keyboard/Switch Control, so the action needs a real button. -->
+						<div style="display:flex;align-items:center;gap:16px">
+							<button
+								class="txt-sm"
+								style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
+								onclick={() => workout.addSet(exIndex)}
+							>
+								<Icon name="plus" size={13} sw={2.2} color="var(--ink-3)" />Add set
+							</button>
+							<button
+								class="txt-sm"
+								style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
+								onclick={() => workout.removeSet(exIndex)}
+								disabled={le.sets.length <= 1}
+								aria-label="Remove last set from {ex?.name}"
+							>
+								<Icon name="minus" size={13} sw={2.2} color="var(--ink-3)" />Remove
+							</button>
+						</div>
 
 						{#if ex?.equipment === 'barbell' && exIndex === workout.activeEx && (le.sets[workout.activeSet]?.weight ?? 0) > 0}
 							<div class="txt-sm" style="display:flex;align-items:center;gap:8px;padding:9px 2px 0;color:var(--ink-2)">
@@ -431,12 +449,12 @@
 
 {#if syncPrompt}
 	<button class="sheet-backdrop" aria-label="Dismiss" onclick={finalizeSync} disabled={syncBusy}></button>
-	<div class="sheet">
-		<div class="sheet-grip"></div>
+	<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1" use:autofocusNode>
+		<div class="sheet-grip" aria-hidden="true"></div>
 		<span class="stat-ic" style="width:46px;height:46px;background:var(--accent-tint);margin-bottom:14px"><Icon name="swap" size={22} color="var(--accent-ink)" /></span>
 
 		{#if syncPrompt.template}
-			<div class="h-card" style="font-size:19px;margin-bottom:6px">Update “{syncPrompt.template.name}”?</div>
+			<div class="h-card" id="sheet-title" style="font-size:19px;margin-bottom:6px">Update “{syncPrompt.template.name}”?</div>
 			<div class="txt" style="margin-bottom:16px">You made changes this workout — apply them back to the template for next time?</div>
 			<div style="display:flex;flex-direction:column;gap:9px">
 				<Button onclick={() => chooseTemplateSync('full')} disabled={syncBusy}>
@@ -452,7 +470,7 @@
 				</Button>
 			</div>
 		{:else}
-			<div class="h-card" style="font-size:19px;margin-bottom:6px">Save as a template?</div>
+			<div class="h-card" id="sheet-title" style="font-size:19px;margin-bottom:6px">Save as a template?</div>
 			<div class="txt" style="margin-bottom:14px">Turn this quick-logged workout into a reusable template.</div>
 			<input class="inp" style="width:100%;height:44px;margin-bottom:16px" type="text" placeholder="Template name" bind:value={newTemplateName} />
 			<div style="display:flex;gap:10px">

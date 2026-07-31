@@ -4,9 +4,16 @@
 		w = 358,
 		h = 168,
 		highlightLast = true,
-		yticks = 3
-	}: { data: { l: string; v: number }[]; w?: number; h?: number; highlightLast?: boolean; yticks?: number } =
-		$props();
+		yticks = 3,
+		label = 'Bar chart'
+	}: {
+		data: { l: string; v: number }[];
+		w?: number;
+		h?: number;
+		highlightLast?: boolean;
+		yticks?: number;
+		label?: string;
+	} = $props();
 
 	const padL = 30,
 		padB = 22,
@@ -18,7 +25,7 @@
 	const barW = $derived(Math.min(slot * 0.62, 26));
 </script>
 
-<svg viewBox="0 0 {w} {h}" width="100%" style="display:block">
+<svg viewBox="0 0 {w} {h}" width="100%" style="display:block" role="img" aria-label={label}>
 	{#each Array.from({ length: yticks + 1 }) as _, i (i)}
 		{@const val = (max / yticks) * i}
 		{@const y = padT + innerH - (val / max) * innerH}

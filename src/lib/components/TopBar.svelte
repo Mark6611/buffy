@@ -2,6 +2,10 @@
 	import Icon from './Icon.svelte';
 	import type { IconName } from '$lib/icons';
 
+	// Action buttons are identified by icon NAME, which is not a label a human would
+	// recognise ("trash"). Map the ones we ship to their real verb.
+	const ACTION_LABEL: Partial<Record<IconName, string>> = { trash: 'Delete', edit: 'Edit' };
+
 	let {
 		title = '',
 		back = true,
@@ -20,10 +24,12 @@
 	{:else}
 		<div style="width:36px"></div>
 	{/if}
-	<div class="topbar-title">{title}</div>
+	<h1 class="topbar-title">{title}</h1>
 	<div style="display:flex;gap:8px">
 		{#each actions as a (a)}
-			<button class="icon-btn" onclick={() => onAction?.(a)} aria-label={a}><Icon name={a} size={18} /></button>
+			<button class="icon-btn" onclick={() => onAction?.(a)} aria-label={ACTION_LABEL[a] ?? a}
+				><Icon name={a} size={18} /></button
+			>
 		{/each}
 		{#if !actions.length}<div style="width:36px"></div>{/if}
 	</div>

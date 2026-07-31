@@ -39,11 +39,11 @@
 	<div class="screen-body">
 		<div class="pad" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
 			<WindowSeg bind:value={win} />
-			<div class="seg" style="width:132px">
-				<button class={view === 'bars' ? 'on' : ''} onclick={() => (view = 'bars')} aria-label="bars">
+			<div class="seg" role="group" aria-label="Chart view" style="width:132px">
+				<button class={view === 'bars' ? 'on' : ''} onclick={() => (view = 'bars')} aria-label="bars" aria-pressed={view === 'bars'}>
 					<Icon name="chart" size={14} />
 				</button>
-				<button class={view === 'map' ? 'on' : ''} onclick={() => (view = 'map')} aria-label="body map">
+				<button class={view === 'map' ? 'on' : ''} onclick={() => (view = 'map')} aria-label="body map" aria-pressed={view === 'map'}>
 					<Icon name="body" size={15} />
 				</button>
 			</div>

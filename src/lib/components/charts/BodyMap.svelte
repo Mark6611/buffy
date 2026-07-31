@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { shade } from '$lib/charts';
-	let { vals, side = 'front' }: { vals: Record<string, number>; side?: 'front' | 'back' } = $props();
+	let {
+		vals,
+		side = 'front',
+		label
+	}: { vals: Record<string, number>; side?: 'front' | 'back'; label?: string } = $props();
 	const v = (k: string) => shade(vals[k] || 0);
+	const ariaLabel = $derived(label ?? `Muscle activity body map, ${side} view`);
 </script>
 
-<svg viewBox="0 0 160 240" width="100%" style="display:block;max-height:300px">
+<svg viewBox="0 0 160 240" width="100%" style="display:block;max-height:300px" role="img" aria-label={ariaLabel}>
 	<circle cx="80" cy="22" r="13" fill="var(--surface-2)" stroke="var(--line)" stroke-width="1" />
 	<rect x="74" y="33" width="12" height="8" rx="3" fill="var(--surface-2)" stroke="var(--line)" stroke-width="1" />
 	{#if side === 'front'}

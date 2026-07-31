@@ -18,6 +18,9 @@
 	let pending = $state<{ backup: BuffyBackup; name: string } | null>(null);
 	let exportFirst = $state(true);
 
+	// move focus into the confirm sheet so assistive tech lands on the dialog
+	function autofocusNode(n: HTMLElement) { n.focus(); }
+
 	onMount(refresh);
 	async function refresh() {
 		const repo = getRepository();
@@ -183,20 +186,27 @@
 
 	{#if pending}
 		<button class="sheet-backdrop" aria-label="Cancel" onclick={() => (pending = null)}></button>
-		<div class="sheet">
-			<div class="sheet-grip"></div>
+		<div
+			class="sheet"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="replace-title"
+			tabindex="-1"
+			use:autofocusNode
+		>
+			<div class="sheet-grip" aria-hidden="true"></div>
 			<span class="stat-ic" style="width:46px;height:46px;background:var(--warn-tint);margin-bottom:14px"><Icon name="alert" size={24} color="var(--warn)" /></span>
-			<div class="h-card" style="font-size:19px;margin-bottom:6px">Replace all data?</div>
+			<div class="h-card" id="replace-title" style="font-size:19px;margin-bottom:6px">Replace all data?</div>
 			<div class="txt" style="margin-bottom:14px">
 				This wipes your current <b style="color:var(--ink)">{counts.sessions} sessions</b> and
 				<b style="color:var(--ink)">{counts.templates} templates</b>, then loads
 				<span class="mono">{pending.name}</span>. This can't be undone.
 			</div>
 			<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;background:var(--surface-2);border-radius:12px;margin-bottom:16px;cursor:pointer">
-				<span class="setcheck {exportFirst ? 'done' : ''}" style="width:22px;height:22px">
+				<span class="setcheck {exportFirst ? 'done' : ''}" style="width:22px;height:22px" aria-hidden="true">
 					{#if exportFirst}<Icon name="check" size={13} sw={2.6} color="#fff" />{/if}
 				</span>
-				<input type="checkbox" bind:checked={exportFirst} style="display:none" />
+				<input type="checkbox" bind:checked={exportFirst} class="sr-only" />
 				<span class="txt-sm" style="color:var(--ink)">Export a backup of current data first</span>
 			</label>
 			<div style="display:flex;gap:10px">
