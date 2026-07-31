@@ -123,4 +123,15 @@
 		background: var(--paper);
 		touch-action: pan-y;
 	}
+
+	/* The settle animates from an inline style attribute, so an important author
+	   declaration is the only normal-origin thing that can beat it — this
+	   !important is load-bearing, not stylistic. The finger-tracked drag is
+	   unaffected (it already sets transition:none while dragging); only the
+	   settle and the close() glide become instant. */
+	@media (prefers-reduced-motion: reduce) {
+		.swipe-content {
+			transition: none !important;
+		}
+	}
 </style>

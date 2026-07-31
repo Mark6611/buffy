@@ -18,7 +18,9 @@
      .h-sec sites, the muted set-table columns and every chart axis label. */
   --ink: oklch(0.24 0.012 60); /* primary text */
   --ink-2: oklch(0.44 0.012 60); /* secondary  — 7.8:1 on --surface */
-  --ink-3: oklch(0.52 0.01 60); /* tertiary   — 5.5:1 surface / 4.8:1 accent-tint */
+  --ink-3: oklch(
+    0.52 0.01 60
+  ); /* tertiary   — 5.5:1 surface / 4.8:1 accent-tint */
 
   /* Boundary tone for unfilled controls. --line is a decorative hairline (exempt);
      this is for controls whose OUTLINE is the only thing conveying their state —
@@ -186,7 +188,9 @@ body {
 /* Screen titles become real <h1>/<h2> for VoiceOver's heading rotor; the visual
    size keeps coming from .h-app/.h-sec/.topbar-title, so neutralise the UA
    margins and sizes these tags would otherwise bring. */
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   margin: 0;
   font-size: inherit;
   font-weight: inherit;
@@ -1008,6 +1012,9 @@ input.inp.rest-inp {
   width: 46px;
   height: 28px;
   border-radius: 99px;
+  /* The UA button border is invisible here (the track paints over it) but it eats
+     into the ::after hit expansion, which resolves against the padding box. */
+  border: none;
   background: var(--line);
   /* The OFF track was 1.27:1 against its card — the control was effectively
      invisible until switched on. Ring rather than a darker fill: it clears the
@@ -1096,4 +1103,158 @@ input.inp.rest-inp {
   background: var(--surface-2);
   color: var(--ink-2);
   border: 1px solid var(--line);
+}
+
+/* ============================================================ HIT TARGETS
+   Apple asks for 44x44pt. Several controls are deliberately smaller than that
+   VISUALLY — shrinking the design to suit is the wrong trade — so each one gets
+   an ::after that extends only its touchable area. A positioned pseudo-element
+   adds no box, so none of this can move a pixel.
+   Insets are derived from each control's real height; where an expansion would
+   reach a NEIGHBOURING control or a tappable parent, it is clipped or omitted
+   rather than allowed to steal taps. */
+.setcheck {
+  position: relative;
+}
+button.setcheck::after {
+  content: "";
+  position: absolute;
+  inset: -12px; /* 24 -> 44, clearing its own 2px ring */
+}
+.icon-btn {
+  position: relative;
+}
+.icon-btn::after {
+  content: "";
+  position: absolute;
+  inset: -5px; /* 36 -> 44, clearing the 1px border */
+}
+.btn {
+  position: relative;
+}
+.btn-rg::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -7px; /* 36 -> 44 tall past the 1px border; every call site is already >=55 wide */
+}
+.toggle::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  bottom: -10px; /* 28 -> 44 tall, clearing the 2px UA button border */
+}
+/* .chip-inline is excluded on purpose: the superset "ungroup" chip sits 3px under
+   the exercise name, so a band above it would fire ungroup on a name tap — worse
+   than a small target. It needs a visual size decision instead. */
+button.chip:not(.chip-inline),
+a.chip:not(.chip-inline) {
+  position: relative;
+}
+button.chip:not(.chip-inline)::after,
+a.chip:not(.chip-inline)::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: -8px;
+  bottom: -8px; /* 30 -> 44 tall past the 1px border; also widens the short "All" chip */
+}
+.seg > button {
+  position: relative;
+}
+.seg > button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  bottom: -8px; /* 30 -> 46 tall; widths already pass */
+}
+.rest-ctrl {
+  position: relative;
+}
+.rest-ctrl::after {
+  content: "";
+  position: absolute;
+  inset: -4px; /* 38 -> 44 (1px border); gap:7px still leaves clearance */
+}
+.rest-seed-btn {
+  position: relative;
+}
+.rest-seed-btn::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: -15px;
+  bottom: -15px; /* ~14 -> 44; its neighbours are not interactive */
+}
+/* Text buttons that carry no box of their own. */
+.tap-row {
+  position: relative;
+}
+.tap-row::after {
+  content: "";
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: -10px;
+  bottom: -9px;
+}
+.tap-link {
+  position: relative;
+}
+.tap-link::after {
+  content: "";
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: -14px;
+  bottom: -14px;
+}
+
+/* ============================================================ FOCUS
+   There was no visible focus indicator anywhere, which also strands iOS Switch
+   Control and Bluetooth-keyboard users. Kept as its own rule: an unsupported
+   selector invalidates the whole list it appears in, and :focus-visible only
+   reached WebKit in iOS 15.4 while the deployment target is 15.0 — so this
+   degrades to "no ring" on 15.0-15.3 rather than breaking other selectors. */
+:focus-visible {
+  outline: 3px solid rgb(var(--accent-rgb) / 0.6);
+  outline-offset: 2px;
+}
+/* The search field's ring belongs on the rounded wrapper, not the bare input.
+   :focus-within is supported well below the iOS floor, unlike :focus-visible. */
+.search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.25);
+}
+
+/* ============================================================ REDUCED MOTION
+   Neutralise MOVEMENT only. Apple's guidance is to replace motion with a
+   cross-fade, not to strip feedback — .btn and .rest-ctrl already transition
+   background-color, so the press still confirms itself once the transform goes. */
+@media (prefers-reduced-motion: reduce) {
+  .btn:active,
+  .icon-btn:active,
+  .rest-ctrl:active,
+  button.chip:active,
+  a.chip:active,
+  .press:active,
+  .press-sm:active {
+    transform: none;
+  }
+  .toggle > i {
+    transition: none;
+  }
+  /* The set rows animate from an inline style attribute, which only an important
+     author declaration can beat. */
+  .settable tbody tr {
+    transition: none !important;
+  }
 }

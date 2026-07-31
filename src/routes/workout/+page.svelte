@@ -403,14 +403,14 @@
 						     by VoiceOver/keyboard/Switch Control, so the action needs a real button. -->
 						<div style="display:flex;align-items:center;gap:16px">
 							<button
-								class="txt-sm"
+								class="txt-sm tap-row"
 								style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
 								onclick={() => workout.addSet(exIndex)}
 							>
 								<Icon name="plus" size={13} sw={2.2} color="var(--ink-3)" />Add set
 							</button>
 							<button
-								class="txt-sm"
+								class="txt-sm tap-row"
 								style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
 								onclick={() => workout.removeSet(exIndex)}
 								disabled={le.sets.length <= 1}

@@ -103,7 +103,9 @@
 			</label>
 
 			<div class="txt-sm" style="margin-bottom:8px">EQUIPMENT</div>
-			<div role="group" aria-label="Equipment" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px">
+			<!-- row-gap must clear the chips' +/-7px hit expansion, or stacked rows steal
+			     each other's taps; the 7px column gap is unchanged. -->
+			<div role="group" aria-label="Equipment" style="display:flex;column-gap:7px;row-gap:16px;flex-wrap:wrap;margin-bottom:16px">
 				{#each equips as e (e)}
 					<button class="chip {equipment === e ? 'solid' : ''}" aria-pressed={equipment === e} onclick={() => (equipment = e)}>
 						<Icon name={EQUIP_ICON[e]} size={13} sw={1.8} color={equipment === e ? '#fff' : 'currentColor'} />

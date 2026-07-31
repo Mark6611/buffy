@@ -8,7 +8,7 @@
 	<h2 class="h-sec">{@render children?.()}</h2>
 	{#if link}
 		<button
-			class="txt-sm"
+			class="txt-sm tap-link"
 			style="color:var(--accent-ink);display:inline-flex;align-items:center;gap:3px;font-weight:500;background:none;border:none;cursor:pointer;padding:0"
 			onclick={onlink}>{link}<Icon name="chevR" size={13} color="var(--accent)" /></button
 		>

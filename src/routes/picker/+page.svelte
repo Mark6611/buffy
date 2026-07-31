@@ -63,7 +63,10 @@
 				<Icon name="search" size={18} color="var(--ink-3)" />
 				<input style="border:none;background:transparent;flex:1;font-size:15px;color:var(--ink)" placeholder="Search exercises…" bind:value={q} />
 			</label>
-			<div role="group" aria-label="Equipment filter" style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px">
+			<!-- overflow-x:auto clips on BOTH axes, which would shear off the chips' vertical
+			     hit expansion. The padding gives it room and the matching negative margins
+			     cancel it, so the row occupies exactly the same space as before. -->
+			<div role="group" aria-label="Equipment filter" style="display:flex;gap:7px;overflow-x:auto;padding:9px 0 13px;margin:-9px 0 -9px">
 				{#each filters as f (f)}
 					<button class="chip {filter === f ? 'solid' : ''}" style="flex:0 0 auto" aria-pressed={filter === f} onclick={() => (filter = f)}>{f}</button>
 				{/each}
