@@ -339,7 +339,7 @@
 							{/snippet}
 						</SwipeActions>
 
-						<table class="settable" aria-label="{ex?.name} sets">
+						<table class="settable editable" aria-label="{ex?.name} sets">
 							<thead>
 								{#if tt === 'cardio'}
 									{#if cardioDist}

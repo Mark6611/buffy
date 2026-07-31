@@ -72,7 +72,7 @@
 								<button class="icon-btn ghost" onclick={() => editor.removeExercise(i)} aria-label="Remove {ex?.name}"><Icon name="trash" size={17} color="var(--ink-3)" /></button>
 							</div>
 
-							<table class="settable" style="margin-top:8px" aria-label="{ex?.name} planned sets">
+							<table class="settable editable" style="margin-top:8px" aria-label="{ex?.name} planned sets">
 								<thead>
 									{#if tt === 'cardio'}
 										{#if cardioDist}

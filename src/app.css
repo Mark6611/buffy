@@ -339,8 +339,11 @@ a.chip:active {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  height: 52px;
-  padding: 0 22px;
+  /* min-height + real vertical padding rather than a fixed height: the box then
+     GROWS with its label instead of clipping it. Padding is set so content never
+     exceeds the rung today, i.e. every button renders at exactly its old height. */
+  min-height: 52px;
+  padding: 14px 22px;
   border-radius: var(--r-pill);
   font-family: var(--font-ui);
   font-size: 16px;
@@ -354,39 +357,45 @@ a.chip:active {
 }
 /* size ladder — kit Large 50 / Medium 44 / Regular 36 / Small 30 */
 .btn-sm {
-  height: 44px;
-  padding: 0 18px;
+  min-height: 44px;
+  padding: 11px 18px;
   font-size: 15px;
   gap: 8px;
 }
 .btn-rg {
-  height: 36px;
-  padding: 0 14px;
+  min-height: 36px;
+  padding: 8px 14px;
   font-size: 13.5px;
   gap: 6px;
 }
 .btn-xs {
-  height: 30px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 6px 12px;
   font-size: 12.5px;
   gap: 5px;
 }
 .btn-block {
   width: 100%;
 }
-/* icon-only → circle, one per size */
+/* icon-only → circle, one per size. Height must be stated explicitly now that the
+   ladder is min-height: these carry no text to grow, and without it the circle
+   would go oval the moment anything relaxed the box. */
 .btn-icon {
   width: 52px;
+  height: 52px;
   padding: 0;
 }
 .btn-sm.btn-icon {
   width: 44px;
+  height: 44px;
 }
 .btn-rg.btn-icon {
   width: 36px;
+  height: 36px;
 }
 .btn-xs.btn-icon {
   width: 30px;
+  height: 30px;
 }
 
 /* variants */
@@ -653,6 +662,19 @@ a.chip:active {
 .settable td.muted {
   color: var(--ink-3);
 }
+
+/* Editable set tables (live workout + template editor). The fields were 30pt
+   against Apple's 44pt minimum — the worst tap targets in the app, on the screen
+   you use mid-set with chalky hands. Raised to 42pt with the cell padding cut to
+   match, so the ROW PITCH is unchanged and the table does not grow.
+   Scoped to .editable on purpose: history reuses .settable for read-only rows,
+   where the same padding cut would collapse the row height. */
+.settable.editable td {
+  padding: 5px 0;
+}
+.settable.editable .inp {
+  min-height: 42px;
+}
 .col-x2 {
   font-family: var(--font-ui);
   font-weight: 600;
@@ -703,7 +725,10 @@ a.chip:active {
   align-items: center;
   justify-content: center;
   min-width: 46px;
-  height: 30px;
+  /* min-height, not height, so the field grows with its text instead of clipping.
+     Vertical padding stays 0: the 16px phone font-size floor already makes the
+     line box ~23px, and adding padding would push every field past 30px. */
+  min-height: 30px;
   padding: 0 8px;
   border-radius: 8px;
   background: var(--surface-2);
