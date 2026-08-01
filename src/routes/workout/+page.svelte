@@ -272,7 +272,7 @@
 		<div class="topbar" style="padding-bottom:6px">
 			<button class="icon-btn" onclick={close} aria-label="Close"><Icon name="chevD" size={20} /></button>
 			<div style="text-align:center">
-				<div style="font-size:15px;font-weight:600;letter-spacing:-0.2px">{workout.session.title}</div>
+				<div style="font-size:calc(var(--dt-base)*15/17);font-weight:600;letter-spacing:-0.2px">{workout.session.title}</div>
 				<div class="mono txt-sm" style="margin-top:1px">
 					{mmss(workout.elapsedSec)} · {workout.exerciseCount
 						? `${workout.activeEx + 1}/${workout.exerciseCount}`
@@ -326,8 +326,8 @@
 								</div>
 							{/snippet}
 							{#snippet actions()}
-								<button class="swipe-btn" style="background:var(--ink-3);width:44px;font-size:16px" aria-label="Move up" onclick={() => moveExercise(exIndex, -1)}>↑</button>
-								<button class="swipe-btn" style="background:var(--ink-3);width:44px;font-size:16px" aria-label="Move down" onclick={() => moveExercise(exIndex, 1)}>↓</button>
+								<button class="swipe-btn" style="background:var(--ink-3);width:44px;font-size:calc(var(--dt-base)*16/17)" aria-label="Move up" onclick={() => moveExercise(exIndex, -1)}>↑</button>
+								<button class="swipe-btn" style="background:var(--ink-3);width:44px;font-size:calc(var(--dt-base)*16/17)" aria-label="Move down" onclick={() => moveExercise(exIndex, 1)}>↓</button>
 								<button class="swipe-btn" style="background:var(--accent)" onclick={() => swapExercise(exIndex)}>
 									<Icon name="swap" size={18} color="#fff" sw={2.2} />
 									<span>Swap</span>
@@ -422,7 +422,7 @@
 
 						{#if ex?.equipment === 'barbell' && exIndex === workout.activeEx && (le.sets[workout.activeSet]?.weight ?? 0) > 0}
 							<div class="txt-sm" style="display:flex;align-items:center;gap:8px;padding:9px 2px 0;color:var(--ink-2)">
-								<span style="font-size:10.5px;font-weight:600;letter-spacing:0.4px;color:var(--ink-3);border:1px solid var(--line);border-radius:5px;padding:1px 5px">BAR</span>
+								<span style="font-size:calc(var(--dt-base)*10.5/17);font-weight:600;letter-spacing:0.4px;color:var(--ink-3);border:1px solid var(--line);border-radius:5px;padding:1px 5px">BAR</span>
 								<span class="mono">{formatPerSide(platesPerSide(le.sets[workout.activeSet]?.weight ?? 0))}</span>
 								<span style="color:var(--ink-3)">/ side</span>
 							</div>
@@ -468,7 +468,7 @@
 		<span class="stat-ic" style="width:46px;height:46px;background:var(--accent-tint);margin-bottom:14px"><Icon name="swap" size={22} color="var(--accent-ink)" /></span>
 
 		{#if syncPrompt.template}
-			<div class="h-card" id="sheet-title" style="font-size:19px;margin-bottom:6px">Update “{syncPrompt.template.name}”?</div>
+			<div class="h-card" id="sheet-title" style="font-size:calc(var(--dt-base)*19/17);margin-bottom:6px">Update “{syncPrompt.template.name}”?</div>
 			<div class="txt" style="margin-bottom:16px">You made changes this workout — apply them back to the template for next time?</div>
 			<div style="display:flex;flex-direction:column;gap:9px">
 				<Button onclick={() => chooseTemplateSync('full')} disabled={syncBusy}>
@@ -484,7 +484,7 @@
 				</Button>
 			</div>
 		{:else}
-			<div class="h-card" id="sheet-title" style="font-size:19px;margin-bottom:6px">Save as a template?</div>
+			<div class="h-card" id="sheet-title" style="font-size:calc(var(--dt-base)*19/17);margin-bottom:6px">Save as a template?</div>
 			<div class="txt" style="margin-bottom:14px">Turn this quick-logged workout into a reusable template.</div>
 			<input class="inp" style="width:100%;height:44px;margin-bottom:16px" type="text" placeholder="Template name" bind:value={newTemplateName} />
 			<div style="display:flex;gap:10px">

@@ -99,7 +99,7 @@
 		<div class="pad" style="padding-bottom:28px">
 			<div class="txt-sm" style="margin:6px 0 6px">NAME</div>
 			<label class="search" style="margin-bottom:16px">
-				<input style="border:none;background:transparent;flex:1;font-size:15px;color:var(--ink)" placeholder="Exercise name" bind:value={name} />
+				<input style="border:none;background:transparent;flex:1;font-size:calc(var(--dt-base)*15/17);color:var(--ink)" placeholder="Exercise name" bind:value={name} />
 			</label>
 
 			<div class="txt-sm" style="margin-bottom:8px">EQUIPMENT</div>
@@ -126,7 +126,7 @@
 						<span class="setcheck {trackingType === o.v ? 'done' : ''}" style="width:22px;height:22px" aria-hidden="true">
 							{#if trackingType === o.v}<Icon name="check" size={13} sw={2.6} color="#fff" />{/if}
 						</span>
-						<div style="flex:1"><div style="font-weight:600;font-size:14.5px">{o.t}</div><div class="txt-sm">{o.s}</div></div>
+						<div style="flex:1"><div style="font-weight:600;font-size:calc(var(--dt-base)*14.5/17)">{o.t}</div><div class="txt-sm">{o.s}</div></div>
 					</button>
 				{/each}
 			</div>
@@ -159,7 +159,7 @@
 					<select
 						bind:value={muscle}
 						aria-label="Primary muscle"
-						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;-webkit-appearance:none;appearance:none"
+						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:calc(var(--dt-base)*16/17);-webkit-appearance:none;appearance:none"
 					>
 						<option value="">No primary muscle</option>
 						{#each MUSCLES as m (m)}<option value={m}>{m}</option>{/each}

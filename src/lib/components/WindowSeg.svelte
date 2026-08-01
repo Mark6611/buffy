@@ -12,7 +12,7 @@
 	{#each opts as o (o.k)}
 		<button
 			class={value === o.k ? 'on' : ''}
-			style="font-family:var(--font-mono);font-size:12px"
+			style="font-family:var(--font-mono);font-size:calc(var(--dt-base)*12/17)"
 			aria-pressed={value === o.k}
 			onclick={() => (value = o.k)}>{o.l}</button
 		>

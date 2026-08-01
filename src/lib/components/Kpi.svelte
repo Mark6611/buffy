@@ -3,6 +3,6 @@
 </script>
 
 <div style="text-align:center;flex:1">
-	<div class={mono ? 'num' : ''} style="font-size:22px;font-weight:700">{v}</div>
+	<div class={mono ? 'num' : ''} style="font-size:calc(var(--dt-base)*22/17);font-weight:700">{v}</div>
 	<div class="txt-sm" style="margin-top:2px">{l}</div>
 </div>

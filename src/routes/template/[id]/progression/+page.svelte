@@ -60,7 +60,7 @@
 						<div style="display:flex;align-items:center;gap:11px">
 							<Thumb equip={r.ex.equipment} size="sm" />
 							<div style="flex:1;min-width:0">
-								<div class="ex-name" style="font-size:14.5px">{r.ex.name}</div>
+								<div class="ex-name" style="font-size:calc(var(--dt-base)*14.5/17)">{r.ex.name}</div>
 								<div class="lasttime" style="margin-top:3px">
 									{r.sg ? `last: ${r.sg.last} · ${r.sg.hit ? 'hit target' : 'missed — aim again'}` : 'no history yet'}
 								</div>
@@ -72,10 +72,10 @@
 						{#if r.sg}
 							<div style="display:flex;align-items:center;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line-soft)">
 								<Icon name="arrowR" size={16} color={r.sg.hit ? 'var(--accent)' : 'var(--ink-3)'} />
-								<span class="num" style="font-size:16px;font-weight:600">
+								<span class="num" style="font-size:calc(var(--dt-base)*16/17);font-weight:600">
 									{r.sg.nextWeight != null ? `${kg(r.sg.nextWeight)}kg` : r.sg.nextReps != null ? `${r.sg.nextReps} reps` : ''}
 								</span>
-								<span class={r.sg.hit ? 'suggest' : 'chip'} style="font-size:11px">
+								<span class={r.sg.hit ? 'suggest' : 'chip'} style="font-size:calc(var(--dt-base)*11/17)">
 									{r.sg.stepLabel === 'hold' ? 'hold weight' : r.sg.stepLabel}
 								</span>
 							</div>

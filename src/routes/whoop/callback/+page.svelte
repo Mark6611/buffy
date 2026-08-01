@@ -23,7 +23,7 @@
 </script>
 
 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:14px;padding:24px;text-align:center">
-	<div class="h-app" style="font-size:22px">Connecting Whoop…</div>
+	<div class="h-app" style="font-size:calc(var(--dt-base)*22/17)">Connecting Whoop…</div>
 	{#if failed}
 		<div class="txt-sm">If Buffy didn't open automatically, tap below on your iPhone.</div>
 		<Button variant="dark" href={appUrl}>Open Buffy</Button>

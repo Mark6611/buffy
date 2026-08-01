@@ -132,7 +132,7 @@
 				<div class="card">
 					<div class="row" style="justify-content:space-between">
 						<div style="font-weight:500">Weight</div>
-						<span class="chip" style="font-size:12px">kg <span class="txt-sm" style="margin-left:4px">fixed</span></span>
+						<span class="chip" style="font-size:calc(var(--dt-base)*12/17)">kg <span class="txt-sm" style="margin-left:4px">fixed</span></span>
 					</div>
 				</div>
 			</div>
@@ -252,7 +252,7 @@
 								{#if recovery.current}
 									<span style="display:inline-flex;align-items:center;gap:6px">
 										<span class="txt-sm">via {recovery.source === 'whoop' ? 'Whoop' : 'Health'}</span>
-										<span class="chip {recovery.current.band === 'fresh' ? 'accent' : recovery.current.band === 'strained' ? 'warn' : ''}" style="font-size:12px;text-transform:capitalize">{recovery.current.band} · {recovery.current.score}</span>
+										<span class="chip {recovery.current.band === 'fresh' ? 'accent' : recovery.current.band === 'strained' ? 'warn' : ''}" style="font-size:calc(var(--dt-base)*12/17);text-transform:capitalize">{recovery.current.band} · {recovery.current.score}</span>
 									</span>
 								{:else}
 									<span class="txt-sm">no data yet — check Health → Sharing → Apps → Buffy, or wait for your wearable to sync</span>
@@ -276,7 +276,7 @@
 								<div class="txt-sm">your real Recovery % and workout Strain, straight from Whoop</div>
 							</div>
 							{#if whoop.connected}
-								<span class="chip accent" style="font-size:12px">Connected</span>
+								<span class="chip accent" style="font-size:calc(var(--dt-base)*12/17)">Connected</span>
 							{:else}
 								<Button size="regular" variant="bordered" onclick={() => whoop.connect()} disabled={whoop.connecting}>
 									{whoop.connecting ? 'Connecting…' : 'Connect'}
@@ -347,7 +347,7 @@
 				<div class="card">
 					<div class="row" style="justify-content:space-between">
 						<div><div style="font-weight:500">Storage</div><div class="txt-sm">local-first · on this device</div></div>
-						<span class="chip" style="font-size:11px">IndexedDB</span>
+						<span class="chip" style="font-size:calc(var(--dt-base)*11/17)">IndexedDB</span>
 					</div>
 					<div class="divider"></div>
 					<button class="row" style="justify-content:space-between;width:100%;background:transparent;border:none;text-align:left" onclick={exportData}>

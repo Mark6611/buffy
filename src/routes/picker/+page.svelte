@@ -61,7 +61,9 @@
 		<div class="pad" style="margin-bottom:12px">
 			<label class="search" style="margin-bottom:12px">
 				<Icon name="search" size={18} color="var(--ink-3)" />
-				<input style="border:none;background:transparent;flex:1;font-size:15px;color:var(--ink)" placeholder="Search exercises…" bind:value={q} />
+				<!-- placeholder kept short: a single-line input cannot wrap it, so at large
+				     text sizes a long one truncates. The full name lives in the aria-label. -->
+				<input style="border:none;background:transparent;flex:1;font-size:calc(var(--dt-base)*15/17);color:var(--ink)" placeholder="Search" aria-label="Search exercises" bind:value={q} />
 			</label>
 			<!-- overflow-x:auto clips on BOTH axes, which would shear off the chips' vertical
 			     hit expansion. The padding gives it room and the matching negative margins
@@ -84,7 +86,7 @@
 					<button class="row" style="width:100%;background:transparent;border:none;text-align:left" onclick={() => pick(c)}>
 						<Thumb equip={c.equipment} size="sm" />
 						<div style="flex:1;min-width:0">
-							<div style="font-weight:500;font-size:14.5px">{c.name}</div>
+							<div style="font-weight:500;font-size:calc(var(--dt-base)*14.5/17)">{c.name}</div>
 							<div class="txt-sm" style="display:flex;gap:8px;align-items:center;margin-top:2px">
 								<span class="mono">{equipLabel(c.equipment)}</span><span>·</span><span>{c.primaryMuscles[0] ?? ''}</span>
 								{#if ttBadge(c)}<span class="tt-badge">{ttBadge(c)}</span>{/if}

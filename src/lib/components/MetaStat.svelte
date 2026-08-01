@@ -8,5 +8,5 @@
 
 <div class="stat-row">
 	<div class="stat-ic"><Icon name={icon} size={18} /></div>
-	<div style="font-size:16px;font-weight:500">{@render children?.()}</div>
+	<div style="font-size:calc(var(--dt-base)*16/17);font-weight:500">{@render children?.()}</div>
 </div>

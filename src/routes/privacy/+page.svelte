@@ -79,10 +79,10 @@
 		color: var(--ink, #1a1a1a);
 		line-height: 1.55;
 	}
-	.policy h1 { font-size: 24px; margin: 0 0 4px; }
-	.policy h2 { font-size: 16px; margin: 26px 0 8px; }
-	.policy p, .policy li { font-size: 14.5px; }
+	.policy h1 { font-size:calc(var(--dt-base)*24/17); margin: 0 0 4px; }
+	.policy h2 { font-size:calc(var(--dt-base)*16/17); margin: 26px 0 8px; }
+	.policy p, .policy li { font-size:calc(var(--dt-base)*14.5/17); }
 	.policy ul { padding-left: 20px; }
 	.policy li { margin-bottom: 6px; }
-	.muted { color: var(--ink-3, #888); font-size: 13px; margin-bottom: 20px; }
+	.muted { color: var(--ink-3, #888); font-size:calc(var(--dt-base)*13/17); margin-bottom: 20px; }
 </style>

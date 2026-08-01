@@ -196,7 +196,7 @@
 		>
 			<div class="sheet-grip" aria-hidden="true"></div>
 			<span class="stat-ic" style="width:46px;height:46px;background:var(--warn-tint);margin-bottom:14px"><Icon name="alert" size={24} color="var(--warn)" /></span>
-			<div class="h-card" id="replace-title" style="font-size:19px;margin-bottom:6px">Replace all data?</div>
+			<div class="h-card" id="replace-title" style="font-size:calc(var(--dt-base)*19/17);margin-bottom:6px">Replace all data?</div>
 			<div class="txt" style="margin-bottom:14px">
 				This wipes your current <b style="color:var(--ink)">{counts.sessions} sessions</b> and
 				<b style="color:var(--ink)">{counts.templates} templates</b>, then loads

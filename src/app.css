@@ -52,6 +52,39 @@
 
   --font-ui: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* ── Dynamic Type ────────────────────────────────────────────────────────
+     Buffy ships custom faces, and a brand font makes the app its own type
+     engine: system fonts get Dynamic Type free, custom ones do not. Every
+     font-size is expressed as calc(var(--dt-base) * N / 17), so at the iOS
+     default (Large = 17px) each resolves to EXACTLY the px it was — a no-op
+     until the user moves the text-size slider. Mechanism proven on-device in
+     the sibling coffee app (live updates, no reload, in WKWebView).
+
+     --dt-base is clamped, not raw: uncapped AX5 is 3.1x and would burst a
+     440px column that does not reflow. 26px caps growth at ~1.53x — a real
+     increase the min-height control ladder (already shipped) absorbs. The
+     clamp lives on a custom property because 1rem inside :root's own
+     font-size resolves against the initial 16px, so the clamp could never
+     see the scaled value there.
+
+     The 17px fallback keeps non-Apple browsers (and CI screenshots) at
+     today's exact baseline — Chromium fails the @supports, so N * 17/17 = N. */
+  --dt-base: 17px;
+  /* The live workout set table is 4-5 numeric columns in a phone-width
+     card; at the full 1.53x its columns cannot coexist. It gets its own
+     tighter cap (~1.18x) — the same call Apple's tabular screens make. */
+  --dt-table: min(var(--dt-base), 20px);
+}
+@supports (font: -apple-system-body) {
+  :root {
+    font: -apple-system-body;
+    /* the shorthand resets line-height to the system body's — restore the
+       initial value so default rendering stays byte-identical; components
+       with tuned unitless line-heights are unaffected either way */
+    line-height: normal;
+    --dt-base: clamp(16px, 1rem, 26px);
+  }
 }
 
 * {
@@ -83,7 +116,9 @@ body {
   input,
   textarea,
   select {
-    font-size: 16px !important;
+    /* floor, not a pin: never below 16px (iOS focus-zoom trigger) but scales
+       with Dynamic Type. max() keeps today's exact 16px at the default. */
+    font-size: max(16px, calc(var(--dt-base) * 16 / 17)) !important;
   }
 }
 
@@ -128,37 +163,37 @@ body {
 
 /* ============================================================ TYPOGRAPHY */
 .h-app {
-  font-size: 30px;
+  font-size: calc(var(--dt-base) * 30 / 17);
   font-weight: 700;
   letter-spacing: -0.5px;
   line-height: 1.05;
 }
 .h-screen {
-  font-size: 13px;
+  font-size: calc(var(--dt-base) * 13 / 17);
   font-weight: 600;
   letter-spacing: 0.2px;
   color: var(--ink);
 }
 .h-sec {
-  font-size: 13px;
+  font-size: calc(var(--dt-base) * 13 / 17);
   font-weight: 600;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 .h-card {
-  font-size: 17px;
+  font-size: calc(var(--dt-base) * 17 / 17);
   font-weight: 600;
   letter-spacing: -0.2px;
   line-height: 1.15;
 }
 .txt {
-  font-size: 14px;
+  font-size: calc(var(--dt-base) * 14 / 17);
   color: var(--ink-2);
   line-height: 1.4;
 }
 .txt-sm {
-  font-size: 12px;
+  font-size: calc(var(--dt-base) * 12 / 17);
   color: var(--ink-3);
 }
 .mono {
@@ -230,7 +265,7 @@ h3 {
   border-color: transparent;
 }
 .topbar-title {
-  font-size: 15px;
+  font-size: calc(var(--dt-base) * 15 / 17);
   font-weight: 600;
   letter-spacing: -0.2px;
 }
@@ -289,7 +324,7 @@ h3 {
   border-radius: var(--r-pill);
   background: var(--surface-2);
   border: 1px solid var(--line);
-  font-size: 12.5px;
+  font-size: calc(var(--dt-base) * 12.5 / 17);
   font-weight: 500;
   color: var(--ink-2);
   white-space: nowrap;
@@ -322,7 +357,7 @@ a.chip:active {
 }
 .chip-eq {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(var(--dt-base) * 11 / 17);
   letter-spacing: 0.3px;
 }
 
@@ -345,7 +380,7 @@ a.chip:active {
   padding: 14px 22px;
   border-radius: var(--r-pill);
   font-family: var(--font-ui);
-  font-size: 16px;
+  font-size: calc(var(--dt-base) * 16 / 17);
   font-weight: 600;
   letter-spacing: -0.2px;
   border: 1px solid transparent;
@@ -358,19 +393,19 @@ a.chip:active {
 .btn-sm {
   min-height: 44px;
   padding: 11px 18px;
-  font-size: 15px;
+  font-size: calc(var(--dt-base) * 15 / 17);
   gap: 8px;
 }
 .btn-rg {
   min-height: 36px;
   padding: 8px 14px;
-  font-size: 13.5px;
+  font-size: calc(var(--dt-base) * 13.5 / 17);
   gap: 6px;
 }
 .btn-xs {
   min-height: 30px;
   padding: 6px 12px;
-  font-size: 12.5px;
+  font-size: calc(var(--dt-base) * 12.5 / 17);
   gap: 5px;
 }
 .btn-block {
@@ -519,6 +554,22 @@ a.chip:active {
   border-top: 1px solid rgb(255 255 255 / 0.7);
 }
 
+/* At large Dynamic Type sizes the bar's side-by-side buttons can burst the
+   column (measured: 432px of content in the 414px viewport at the 1.53x cap).
+   Trade horizontal padding for text room as type grows: exactly 22px at the
+   default (--dt-base 17px), shrinking toward 10px at the cap. */
+.actionbar .btn {
+  min-width: 0;
+  padding-inline: clamp(10px, calc(22px - (var(--dt-base) - 17px) * 1.4), 22px);
+  /* Labels stay on ONE line at every size — wrapping was tried first and
+     "Auto-Progression" broke at its hyphen even at the default, growing the
+     bar past its clearance. Instead the bar's own type caps at ~1.3x (22px
+     base) while the rest of the app runs to 1.53x: with the padding squeeze
+     above, the widest pair ("Start" + "Auto-Progression") fits nowrap at the
+     cap. min(17,22) = 17 at the default — byte-identical rendering. */
+  font-size: calc(min(var(--dt-base), 22px) * 16 / 17);
+}
+
 /* Scroll clearance for a screen that carries an .actionbar. Because the bar is a
    true overlay, content scrolls UNDER it and the page has to reserve its height at
    the end of the scroll region. Derived from the bar above — 14px top padding + a
@@ -584,13 +635,13 @@ a.chip:active {
   min-width: 0;
 }
 .ex-name {
-  font-size: 16px;
+  font-size: calc(var(--dt-base) * 16 / 17);
   font-weight: 600;
   letter-spacing: -0.2px;
   line-height: 1.15;
 }
 .ex-meta {
-  font-size: 12px;
+  font-size: calc(var(--dt-base) * 12 / 17);
   color: var(--ink-3);
   margin-top: 2px;
 }
@@ -599,7 +650,7 @@ a.chip:active {
   align-items: center;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(var(--dt-base) * 11.5 / 17);
   color: var(--accent-ink);
   background: var(--accent-tint);
   padding: 3px 8px;
@@ -618,7 +669,7 @@ a.chip:active {
   justify-content: center;
   gap: 4px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: calc(var(--dt-base) * 11 / 17);
   font-weight: 600;
 }
 
@@ -628,7 +679,7 @@ a.chip:active {
 }
 .settable th {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: calc(var(--dt-table) * 11 / 17);
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -645,7 +696,7 @@ a.chip:active {
 .settable td {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 16px;
+  font-size: calc(var(--dt-table) * 16 / 17);
   font-weight: 500;
   color: var(--ink);
   text-align: right;
@@ -673,11 +724,14 @@ a.chip:active {
 }
 .settable.editable .inp {
   min-height: 42px;
+  /* the global input floor would scale these to 1.53x and burst the 4-5
+     column table — cap them with the table's own token instead */
+  font-size: max(16px, calc(var(--dt-table) * 16 / 17)) !important;
 }
 .col-x2 {
   font-family: var(--font-ui);
   font-weight: 600;
-  font-size: 11px;
+  font-size: calc(var(--dt-base) * 11 / 17);
   color: var(--ink-2);
 }
 
@@ -734,7 +788,7 @@ a.chip:active {
   border: 1px solid var(--line);
   font-family: var(--font-mono);
   font-weight: 500;
-  font-size: 15px;
+  font-size: calc(var(--dt-base) * 15 / 17);
   color: var(--ink);
 }
 .inp.focus {
@@ -795,7 +849,7 @@ input.inp.rest-inp {
   background: var(--surface-2);
   border: 1px solid var(--line);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: calc(var(--dt-base) * 14 / 17);
   color: var(--ink);
   line-height: 1.45;
 }
@@ -811,7 +865,7 @@ input.inp.rest-inp {
 
 .lasttime {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(var(--dt-base) * 11.5 / 17);
   color: var(--ink-3);
 }
 .suggest {
@@ -819,7 +873,7 @@ input.inp.rest-inp {
   align-items: center;
   gap: 5px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(var(--dt-base) * 11.5 / 17);
   font-weight: 500;
   color: var(--accent-ink);
   background: var(--accent-tint);
@@ -842,7 +896,7 @@ input.inp.rest-inp {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10.5px;
+  font-size: calc(var(--dt-base) * 10.5 / 17);
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
@@ -862,7 +916,7 @@ input.inp.rest-inp {
   justify-content: center;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(var(--dt-base) * 11.5 / 17);
   color: var(--accent-ink);
   padding: 8px;
   margin-top: 6px;
@@ -887,12 +941,12 @@ input.inp.rest-inp {
 .rest-time {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 30px;
+  font-size: calc(var(--dt-base) * 30 / 17);
   letter-spacing: -1px;
   line-height: 1;
 }
 .rest-label {
-  font-size: 11px;
+  font-size: calc(var(--dt-base) * 11 / 17);
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
@@ -932,7 +986,7 @@ input.inp.rest-inp {
   flex: 0 0 auto;
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 12px;
+  font-size: calc(var(--dt-base) * 12 / 17);
   cursor: pointer;
   transition: transform 120ms cubic-bezier(0.2, 0, 0, 1),
     background-color 160ms ease;
@@ -943,7 +997,7 @@ input.inp.rest-inp {
 }
 .rest-seed-btn {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: calc(var(--dt-base) * 12 / 17);
   color: #fff;
   background: none;
   border: none;
@@ -961,7 +1015,7 @@ input.inp.rest-inp {
   color: #fff;
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(var(--dt-base) * 13 / 17);
   outline: none;
 }
 
@@ -991,7 +1045,7 @@ input.inp.rest-inp {
   background: transparent;
   border-radius: 9px;
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: calc(var(--dt-base) * 13 / 17);
   font-weight: 500;
   color: var(--ink-2);
   padding: 7px 0;
@@ -1047,7 +1101,7 @@ input.inp.rest-inp {
   border-radius: 13px;
   padding: 11px 14px;
   color: var(--ink-3);
-  font-size: 15px;
+  font-size: calc(var(--dt-base) * 15 / 17);
 }
 
 .stat-row {
@@ -1084,12 +1138,12 @@ input.inp.rest-inp {
   border: 1px solid var(--line);
   color: var(--ink-3);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(var(--dt-base) * 11 / 17);
 }
 
 .tt-badge {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: calc(var(--dt-base) * 10 / 17);
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;

@@ -69,7 +69,7 @@
 						{@const band = recovery.current.band}
 						<button
 							class="chip {band === 'fresh' ? 'accent' : band === 'strained' ? 'warn' : ''}"
-							style="font-size:11px;text-transform:capitalize;border:none"
+							style="font-size:calc(var(--dt-base)*11/17);text-transform:capitalize;border:none"
 							onclick={() => goto('/settings')}
 							aria-label="Readiness {band} {recovery.current.score} — via {recovery.source === 'whoop' ? 'Whoop' : 'Apple Health'}; tap for details"
 						>
@@ -77,7 +77,7 @@
 						</button>
 					{/if}
 				</div>
-				<h1 class="h-app" style="font-size:28px">Workouts</h1>
+				<h1 class="h-app" style="font-size:calc(var(--dt-base)*28/17)">Workouts</h1>
 			</div>
 			<div style="display:flex;gap:8px">
 				<button class="icon-btn" onclick={() => goto('/trends')} aria-label="Trends">
@@ -139,13 +139,13 @@
 						<Icon name="trend" size={19} color="var(--accent-ink)" />
 					</span>
 					<div style="flex:1;min-width:0">
-						<div style="font-size:13px;font-weight:600">This week</div>
+						<div style="font-size:calc(var(--dt-base)*13/17);font-weight:600">This week</div>
 						<div class="txt-sm mono" style="margin-top:2px">
 							{k.sessionsThisWeek} sessions · {volK(k.volThisWeek)} kg{#if k.streakDays > 0}
 								· <span style="color:var(--accent-ink)"><span aria-hidden="true">🔥</span> {k.streakDays}-day streak</span>{/if}
 						</div>
 					</div>
-					<span class="chip" style="font-size:11px">Trends<Icon name="chevR" size={13} /></span>
+					<span class="chip" style="font-size:calc(var(--dt-base)*11/17)">Trends<Icon name="chevR" size={13} /></span>
 				</button>
 			</div>
 		{/if}
@@ -173,7 +173,7 @@
 						<div style="display:flex;align-items:center;gap:8px">
 							<div class="h-card" style="flex:1">{t.name}</div>
 							{#if t.groups.length}
-								<span class="chip accent" style="padding:3px 8px;font-size:11px">Superset</span>
+								<span class="chip accent" style="padding:3px 8px;font-size:calc(var(--dt-base)*11/17)">Superset</span>
 							{/if}
 						</div>
 						<div class="ex-meta" style="margin-top:4px;display:flex;gap:12px">
@@ -185,7 +185,7 @@
 						</div>
 						<div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
 							{#each d.muscles.slice(0, 2) as m (m)}
-								<span class="chip" style="padding:4px 9px;font-size:11.5px">{m}</span>
+								<span class="chip" style="padding:4px 9px;font-size:calc(var(--dt-base)*11.5/17)">{m}</span>
 							{/each}
 							{#if d.equipment[0]}<EqChip equip={d.equipment[0]} />{/if}
 						</div>

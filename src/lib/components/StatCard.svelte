@@ -19,7 +19,7 @@
 		{#if delta}
 			<span
 				class="num"
-				style="margin-left:auto;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:2px;color:{deltaUp
+				style="margin-left:auto;font-size:calc(var(--dt-base)*11/17);font-weight:600;display:inline-flex;align-items:center;gap:2px;color:{deltaUp
 					? 'var(--accent-ink)'
 					: 'var(--ink-3)'}"
 			>
@@ -27,6 +27,6 @@
 			</span>
 		{/if}
 	</div>
-	<div class="num" style="font-size:23px;font-weight:700;letter-spacing:-0.5px;line-height:1">{big}</div>
+	<div class="num" style="font-size:calc(var(--dt-base)*23/17);font-weight:700;letter-spacing:-0.5px;line-height:1">{big}</div>
 	<div class="txt-sm" style="margin-top:4px">{label}</div>
 </div>

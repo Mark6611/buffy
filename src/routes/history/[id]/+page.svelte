@@ -56,7 +56,7 @@
 	<div class="ex-head" style="padding-bottom:4px">
 		<Thumb equip={ex?.equipment ?? 'dumbbell'} size="sm" />
 		<div class="ex-title">
-			<div class="ex-name" style="font-size:15px">{ex?.name}</div>
+			<div class="ex-name" style="font-size:calc(var(--dt-base)*15/17)">{ex?.name}</div>
 			{#if le.setupNote}<span class="setup-note" style="margin-top:4px"><Icon name="cog" size={11} sw={2} />{le.setupNote}</span>{/if}
 		</div>
 	</div>
@@ -100,7 +100,7 @@
 	<div class="screen-body">
 		{#if s}
 			<div class="pad" style="padding-bottom:28px">
-				<h1 class="h-app" style="font-size:26px">{s.title ?? 'Workout'}</h1>
+				<h1 class="h-app" style="font-size:calc(var(--dt-base)*26/17)">{s.title ?? 'Workout'}</h1>
 				<div class="txt-sm mono" style="margin-top:4px;margin-bottom:12px">
 					{relativeDay(s.startedAt)} · {hhmm(s.startedAt)} · {mmss(sessionDurationSec(s) ?? 0)}
 				</div>
@@ -152,7 +152,7 @@
 					{#each s.exercises as le, i (le.exerciseId + ':' + i)}
 						<div class="card card-pad">
 							{#if le.groupId}
-								<span class="chip accent" style="font-size:10.5px;padding:3px 8px;margin-bottom:8px">
+								<span class="chip accent" style="font-size:calc(var(--dt-base)*10.5/17);padding:3px 8px;margin-bottom:8px">
 									<Icon name="link" size={11} color="var(--accent-ink)" sw={2.2} />Superset
 								</span>
 							{/if}

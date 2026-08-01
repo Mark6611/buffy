@@ -72,7 +72,7 @@
 						<span style="width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:var(--accent-tint);margin-bottom:16px">
 							<Icon name="trend" size={28} color="var(--accent-ink)" sw={1.7} />
 						</span>
-						<div class="h-card" style="font-size:18px;margin-bottom:6px">Charts unlock as you log</div>
+						<div class="h-card" style="font-size:calc(var(--dt-base)*18/17);margin-bottom:6px">Charts unlock as you log</div>
 						<div class="txt" style="max-width:260px">
 							{sessions.length} {sessions.length === 1 ? 'workout' : 'workouts'} in. After ~3 sessions you'll see volume
 							trends, a consistency heatmap, and your first PRs here.
@@ -123,7 +123,7 @@
 				<SecHead>Consistency</SecHead>
 				<div class="card card-pad">
 					<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-						<span class="chip accent" style="font-size:11px"><Icon name="fire" size={12} color="var(--accent-ink)" />{k.streakDays}-day streak</span>
+						<span class="chip accent" style="font-size:calc(var(--dt-base)*11/17)"><Icon name="fire" size={12} color="var(--accent-ink)" />{k.streakDays}-day streak</span>
 						<span class="txt-sm">{heat.sessions} sessions · ~{heat.perWeek} / week</span>
 					</div>
 					<Heatmap weeks={heat.weeks} />
@@ -148,7 +148,7 @@
 					>
 						<Thumb equip={preview.exercise.equipment} />
 						<div style="flex:1;min-width:0">
-							<div class="ex-name" style="font-size:14.5px">{preview.exercise.name}</div>
+							<div class="ex-name" style="font-size:calc(var(--dt-base)*14.5/17)">{preview.exercise.name}</div>
 							<div class="txt-sm mono" style="margin-top:2px">{preview.summary}</div>
 						</div>
 						<Spark data={preview.spark} />
@@ -182,12 +182,12 @@
 							<div class="row">
 								<span class="stat-ic" style="background:var(--accent-tint)"><Icon name="trophy" size={16} color="var(--accent-ink)" /></span>
 								<div style="flex:1;min-width:0">
-									<div style="font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{p.ex}</div>
+									<div style="font-size:calc(var(--dt-base)*13.5/17);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{p.ex}</div>
 									<div class="txt-sm">{p.kind} · {p.when}</div>
 								</div>
 								<div style="text-align:right">
-									<div class="num" style="font-size:15px;font-weight:600">{p.v}</div>
-									<div class="suggest" style="font-size:10px;padding:1px 6px;margin-top:2px">{p.delta}</div>
+									<div class="num" style="font-size:calc(var(--dt-base)*15/17);font-weight:600">{p.v}</div>
+									<div class="suggest" style="font-size:calc(var(--dt-base)*10/17);padding:1px 6px;margin-top:2px">{p.delta}</div>
 								</div>
 							</div>
 						{/each}
@@ -200,7 +200,7 @@
 				<button class="card card-pad" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left" onclick={() => goto('/trends/backup')}>
 					<span class="stat-ic" style="width:40px;height:40px;background:var(--ink)"><Icon name="shield" size={20} color="#fff" /></span>
 					<div style="flex:1">
-						<div class="h-card" style="font-size:15px">Backup &amp; restore</div>
+						<div class="h-card" style="font-size:calc(var(--dt-base)*15/17)">Backup &amp; restore</div>
 						<div class="txt-sm" style="margin-top:1px">On-device only · keep your data safe</div>
 					</div>
 					<Icon name="chevR" size={18} color="var(--ink-3)" />

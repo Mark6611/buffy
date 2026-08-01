@@ -35,7 +35,7 @@
 				<div class="txt-sm" style="margin-bottom:6px">NAME</div>
 				<input
 					class="h-app"
-					style="font-size:24px;width:100%;border:none;border-bottom:2px solid var(--accent);background:transparent;padding-bottom:8px;margin-bottom:18px"
+					style="font-size:calc(var(--dt-base)*24/17);width:100%;border:none;border-bottom:2px solid var(--accent);background:transparent;padding-bottom:8px;margin-bottom:18px"
 					aria-label="Template name"
 					placeholder="Template name"
 					bind:value={draft.name}
@@ -44,7 +44,7 @@
 				<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
 					<span class="h-sec">Exercises · {draft.exercises.length}</span>
 					{#if editor.selection.size > 0}
-						<span class="chip accent" style="font-size:11px">{editor.selection.size} selected</span>
+						<span class="chip accent" style="font-size:calc(var(--dt-base)*11/17)">{editor.selection.size} selected</span>
 					{/if}
 				</div>
 
@@ -62,7 +62,7 @@
 								</button>
 								<Thumb equip={ex?.equipment ?? 'dumbbell'} size="sm" />
 								<div style="flex:1;min-width:0">
-									<div class="ex-name" style="font-size:14px">{ex?.name}</div>
+									<div class="ex-name" style="font-size:calc(var(--dt-base)*14/17)">{ex?.name}</div>
 									{#if te.groupId}
 										<!-- A full-size chip, not a dense badge: this ungroups a superset, so it
 										     needs a real target. margin-top gives its hit expansion room to reach

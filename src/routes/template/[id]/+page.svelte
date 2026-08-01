@@ -73,7 +73,7 @@
 		<Thumb equip={ex?.equipment ?? 'dumbbell'} />
 		<div style="flex:1;min-width:0">
 			<div class="ex-name">{ex?.name}</div>
-			<div class="num" style="font-size:13px;color:var(--ink-2);margin-top:4px">{line(te)}</div>
+			<div class="num" style="font-size:calc(var(--dt-base)*13/17);color:var(--ink-2);margin-top:4px">{line(te)}</div>
 			{#if te.setupNote ?? ex?.setupNote}
 				<span class="setup-note" style="margin-top:6px">
 					<Icon name="cog" size={12} sw={2} />{te.setupNote ?? ex?.setupNote}

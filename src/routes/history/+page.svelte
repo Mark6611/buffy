@@ -30,7 +30,7 @@
 		<div style="display:flex;align-items:flex-end;justify-content:space-between;padding:8px 20px 14px">
 			<div>
 				<div class="txt-sm" style="margin-bottom:2px">{sessions.length} sessions</div>
-				<h1 class="h-app" style="font-size:28px">History</h1>
+				<h1 class="h-app" style="font-size:calc(var(--dt-base)*28/17)">History</h1>
 			</div>
 			<button class="icon-btn" onclick={() => goto('/')} aria-label="Home"><Icon name="back" size={18} /></button>
 		</div>
@@ -56,8 +56,8 @@
 					<Thumb equip={adhoc ? 'dumbbell' : 'machine'} />
 					<div style="flex:1;min-width:0">
 						<div style="display:flex;align-items:center;gap:7px">
-							<span class="h-card" style="font-size:16px">{s.title ?? 'Workout'}</span>
-							{#if adhoc}<span class="chip" style="font-size:10px;padding:2px 7px">ad-hoc</span>{/if}
+							<span class="h-card" style="font-size:calc(var(--dt-base)*16/17)">{s.title ?? 'Workout'}</span>
+							{#if adhoc}<span class="chip" style="font-size:calc(var(--dt-base)*10/17);padding:2px 7px">ad-hoc</span>{/if}
 						</div>
 						<div class="txt-sm mono" style="margin-top:3px">
 							{relativeDay(s.startedAt)} · {hhmm(s.startedAt)} · {durationLabel(sessionDurationSec(s) ?? 0)}
@@ -65,7 +65,7 @@
 						<div style="display:flex;gap:12px;margin-top:7px;align-items:center">
 							<span class="txt-sm"><span class="num" style="color:var(--ink)">{sessionSetCount(s)}</span> sets</span>
 							<span class="txt-sm"><span class="num" style="color:var(--ink)">{volK(sessionVolume(s))}</span> kg vol</span>
-							{#if s.note}<span class="suggest" style="font-size:10.5px">{s.note}</span>{/if}
+							{#if s.note}<span class="suggest" style="font-size:calc(var(--dt-base)*10.5/17)">{s.note}</span>{/if}
 						</div>
 					</div>
 					<Icon name="chevR" size={18} color="var(--ink-3)" />

@@ -70,8 +70,8 @@
 					<SecHead>Push vs pull · sets / week</SecHead>
 					<div class="card card-pad">
 						<div style="display:flex;gap:16px;margin-bottom:6px">
-							<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)"><span style="width:16px;height:3px;border-radius:2px;background:var(--accent)"></span>push</span>
-							<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)"><span style="width:16px;height:0;border-top:2px dashed var(--ink)"></span>pull</span>
+							<span style="display:inline-flex;align-items:center;gap:6px;font-size:calc(var(--dt-base)*12/17);color:var(--ink-2)"><span style="width:16px;height:3px;border-radius:2px;background:var(--accent)"></span>push</span>
+							<span style="display:inline-flex;align-items:center;gap:6px;font-size:calc(var(--dt-base)*12/17);color:var(--ink-2)"><span style="width:16px;height:0;border-top:2px dashed var(--ink)"></span>pull</span>
 						</div>
 						<LineChart
 							labels={pp.labels}

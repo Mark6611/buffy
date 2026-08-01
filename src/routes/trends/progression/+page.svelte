@@ -71,13 +71,13 @@
 					<Thumb equip={selected.equipment} size="sm" />
 					<div style="flex:1;min-width:0">
 						<div class="txt-sm">Exercise</div>
-						<div class="ex-name" style="font-size:15px">{selected.name}</div>
+						<div class="ex-name" style="font-size:calc(var(--dt-base)*15/17)">{selected.name}</div>
 					</div>
 					<Icon name="chevD" size={18} color="var(--ink-3)" />
 					<select
 						bind:value={selectedId}
 						aria-label="Choose exercise"
-						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;-webkit-appearance:none;appearance:none"
+						style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:calc(var(--dt-base)*16/17);-webkit-appearance:none;appearance:none"
 					>
 						{#each logged as e (e.id)}<option value={e.id}>{e.name}</option>{/each}
 					</select>
@@ -99,8 +99,8 @@
 					<div class="card card-pad">
 						{#if p.hasWeight}
 							<div style="display:flex;gap:16px;margin-bottom:6px">
-								<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)"><span style="width:16px;height:3px;border-radius:2px;background:var(--accent)"></span>top set</span>
-								<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)"><span style="width:16px;height:0;border-top:2px dashed var(--ink)"></span>est. 1RM</span>
+								<span style="display:inline-flex;align-items:center;gap:6px;font-size:calc(var(--dt-base)*12/17);color:var(--ink-2)"><span style="width:16px;height:3px;border-radius:2px;background:var(--accent)"></span>top set</span>
+								<span style="display:inline-flex;align-items:center;gap:6px;font-size:calc(var(--dt-base)*12/17);color:var(--ink-2)"><span style="width:16px;height:0;border-top:2px dashed var(--ink)"></span>est. 1RM</span>
 							</div>
 						{/if}
 						<LineChart labels={p.labels} {series} />
@@ -122,8 +122,8 @@
 								{#if i > 0}<div class="divider"></div>{/if}
 								<div class="row">
 									<span class="stat-ic"><Icon name={pr.ic as IconName} size={16} color="var(--accent-ink)" /></span>
-									<div style="flex:1"><div style="font-size:13.5px;font-weight:500">{pr.l}</div><div class="txt-sm">{pr.when}</div></div>
-									<span class="num" style="font-size:16px;font-weight:700">{pr.v}</span>
+									<div style="flex:1"><div style="font-size:calc(var(--dt-base)*13.5/17);font-weight:500">{pr.l}</div><div class="txt-sm">{pr.when}</div></div>
+									<span class="num" style="font-size:calc(var(--dt-base)*16/17);font-weight:700">{pr.v}</span>
 								</div>
 							{/each}
 						</div>

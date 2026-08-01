@@ -57,7 +57,7 @@
 		<div>
 			<div class="h-sec">Body weight</div>
 			{#if latest}
-				<div style="font-size:24px;font-weight:700;margin-top:2px">
+				<div style="font-size:calc(var(--dt-base)*24/17);font-weight:700;margin-top:2px">
 					{kg(latest.kg)} <span class="txt-sm" style="font-weight:500">kg</span>
 				</div>
 				{#if delta != null}
