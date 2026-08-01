@@ -63,6 +63,13 @@ echo "══ Gate 3/3: E2E (against a fresh PRODUCTION build, never a stale dev 
 # of validating whatever dev server happened to be left listening on :4173.
 CI=1 npm run test:e2e
 
+echo "══ ASC preflight (catches upload blockers BEFORE the archive is spent)"
+# Read-only ASC + keychain checks. Exit 1 = upload blocker (dup build number,
+# missing/expired signing cert, missing ASC key) → set -e hard-fails the pipeline.
+# Review-slot / submission findings print as warnings only — they don't block
+# TestFlight. Pass --strict manually before an App Store submission run.
+node scripts/asc-preflight.mjs ${BUILD_NUM:+"$BUILD_NUM"}
+
 echo "══ Version bump"
 # The authoritative highest build number is on App Store Connect — the local
 # pbxproj can lag behind it (e.g. a build shipped by an older path never committed
