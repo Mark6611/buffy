@@ -1,13 +1,18 @@
-// First-run seed: the real catalog, the four templates, and ~12 weeks of generated
-// session history (so history, KPIs, trends, and auto-progression have real data).
-// Seeding is idempotent (skips if non-empty).
+// First-run seed: the real catalog and the four templates. Seeding is idempotent
+// (skips once a run has completed).
+//
+// It USED to also write ~12 weeks of generated session history, so that history,
+// KPIs, trends and auto-progression had something to draw. That backfired: the
+// fabricated sessions are indistinguishable from real ones in History, and every
+// stat, PR delta and progression curve a new user sees is measured against invented
+// weights. New installs now start with an empty history and earn their charts.
+// Existing installs still hold those 36 sessions, so the deterministic id set they
+// were minted with is kept below to power Settings → "Remove sample data".
 import type {
   Exercise,
   Template,
   TemplateExercise,
   PlannedSet,
-  WorkoutSession,
-  LoggedExercise,
   Settings,
   ID,
 } from "$lib/types";
@@ -345,83 +350,42 @@ function buildTemplates(iso: string): Template[] {
   ];
 }
 
-// ---- Sessions (history) -----------------------------------------------------
-const PER_SIDE_IDS = new Set([
-  "fly-high",
-  "fly-low",
-  "bicep-curl",
-  "shoulder-press",
-]);
-function isPerSide(id: ID): boolean {
-  return PER_SIDE_IDS.has(id);
-}
+// ---- Retired demo history ---------------------------------------------------
+// No longer written (see the file header), but existing installs are full of it, so
+// Settings needs to identify it EXACTLY in order to purge it without ever touching a
+// real workout. Ids are the only reliable marker: a genuine session gets a newId(),
+// and `sess-<template>-w<week>-d<day>` was only ever minted by the generator below.
+//
+// The loop must mirror the original generator exactly — it walked the four templates
+// in round-robin across 12 weeks × 3 days, so only 36 of the 4×12×3 name combinations
+// were ever produced (e.g. `sess-legs-w11-d2` never existed).
+const DEMO_TEMPLATE_ORDER = [
+  "chest-tricep",
+  "back-bicep",
+  "shoulder-core",
+  "legs",
+];
+const DEMO_DAY_OFFSETS = [2, 4, 6]; // three days within each week
 
-function daysAgoIso(now: number, days: number, plusMin = 0): string {
-  return new Date(now - days * 86_400_000 + plusMin * 60_000).toISOString();
-}
-
-/** Logged exercises from a template's planned sets, with progressive overload applied. */
-function loggedProgression(
-  t: Template,
-  bumps: number,
-  exById: Map<string, Exercise>
-): LoggedExercise[] {
-  return t.exercises.map((tex) => {
-    const ex = exById.get(tex.exerciseId);
-    const step = ex?.weightStep ?? 2.5;
-    return {
-      exerciseId: tex.exerciseId,
-      groupId: tex.groupId ?? null,
-      setupNote: tex.setupNote,
-      sets: tex.plannedSets.map((ps, i) => ({
-        index: i,
-        completed: true,
-        reps: ps.targetReps,
-        weight:
-          ps.targetWeight != null
-            ? Math.round((ps.targetWeight + step * bumps) * 10) / 10
-            : undefined,
-        durationSec:
-          ps.targetDurationSec != null
-            ? ps.targetDurationSec + bumps * 3
-            : undefined,
-        perSide:
-          ps.targetWeight != null ? isPerSide(tex.exerciseId) : undefined,
-        restTakenSec: ps.targetRestSec,
-      })),
-    };
-  });
-}
-
-/** ~12 weeks of history — 3 sessions/week cycling the four templates, weights climbing over time. */
-function buildSessions(
-  now: number,
-  templates: Template[],
-  exById: Map<string, Exercise>
-): WorkoutSession[] {
-  const tplById = new Map(templates.map((t) => [t.id, t]));
-  const order = ["chest-tricep", "back-bicep", "shoulder-core", "legs"];
-  const dayOffsets = [2, 4, 6]; // three days within each week
-  const sessions: WorkoutSession[] = [];
+/** The 36 session ids the retired ~12-week demo history used to create. */
+export function demoSessionIds(): ID[] {
+  const ids: ID[] = [];
   let idx = 0;
-  for (let w = 11; w >= 0; w--) {
-    for (const off of dayOffsets) {
-      const tpl = tplById.get(order[idx % order.length]);
-      idx++;
-      if (!tpl) continue;
-      const daysAgo = w * 7 + (7 - off);
-      const bumps = Math.floor((11 - w) / 3); // climbs 0 → 3 across the window
-      sessions.push({
-        id: `sess-${tpl.id}-w${w}-d${off}`,
-        startedAt: daysAgoIso(now, daysAgo),
-        endedAt: daysAgoIso(now, daysAgo, 45),
-        sourceTemplateId: tpl.id,
-        title: tpl.name,
-        exercises: loggedProgression(tpl, bumps, exById),
-      });
-    }
-  }
-  return sessions;
+  for (let w = 11; w >= 0; w--)
+    for (const off of DEMO_DAY_OFFSETS)
+      ids.push(
+        `sess-${
+          DEMO_TEMPLATE_ORDER[idx++ % DEMO_TEMPLATE_ORDER.length]
+        }-w${w}-d${off}`
+      );
+  return ids;
+}
+
+const DEMO_SESSION_IDS = new Set<ID>(demoSessionIds());
+
+/** True only for a session minted by the retired demo-history seed. */
+export function isDemoSessionId(id: ID): boolean {
+  return DEMO_SESSION_IDS.has(id);
 }
 
 // Every seed record shares this fixed, ancient updatedAt so that ANY genuine user
@@ -434,11 +398,13 @@ function buildSessions(
 const SEED_EPOCH = "2000-01-01T00:00:00.000Z";
 
 /** Marks a seed that ran to COMPLETION. The old guard — "are there any exercises?"
- *  — was true as soon as the first of three write phases finished, so a reload or
- *  app kill mid-seed left the catalog populated but the templates and sample
- *  sessions permanently missing: every later launch short-circuited on that guard.
+ *  — was true as soon as the first of the write phases finished, so a reload or
+ *  app kill mid-seed left the catalog populated but the templates permanently
+ *  missing: every later launch short-circuited on that guard.
  *  Re-running the seed is safe, so the fast path is allowed to be wrong-but-rare in
- *  only one direction (re-run), never in the other (skip an unfinished seed). */
+ *  only one direction (re-run), never in the other (skip an unfinished seed).
+ *  The key stays at v1: bumping it would re-run the seed on every existing install,
+ *  which achieves nothing now that only the catalog and templates are written. */
 const SEED_DONE_KEY = "buffy:seeded:v1";
 
 export async function seedDatabase(repo: Repository): Promise<void> {
@@ -457,18 +423,11 @@ export async function seedDatabase(repo: Repository): Promise<void> {
   for (const e of EXERCISES)
     await repo.applySyncedExercise({ ...e, updatedAt: SEED_EPOCH });
 
-  const now = Date.now();
-  const iso = new Date(now).toISOString();
-  const templates = buildTemplates(iso);
-  for (const t of templates)
+  const iso = new Date().toISOString();
+  for (const t of buildTemplates(iso))
     await repo.applySyncedTemplate({ ...t, updatedAt: SEED_EPOCH });
 
-  for (const s of buildSessions(
-    now,
-    templates,
-    new Map(EXERCISES.map((e) => [e.id, e]))
-  ))
-    await repo.applySyncedSession({ ...s, updatedAt: SEED_EPOCH });
+  // NO sample sessions: history starts empty and is filled by real workouts.
 
   // Only now is the seed complete. Set last, so an interrupted run is retried.
   try {

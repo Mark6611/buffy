@@ -3,6 +3,7 @@
 	import { getRepository } from '$lib/db';
 	import { exportJSON, exportCSV, parseBackup, importBackup, type BuffyBackup, type ImportMode } from '$lib/data';
 	import { relativeDay } from '$lib/format';
+	import { settings } from '$lib/stores/settings.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -21,7 +22,11 @@
 	// move focus into the confirm sheet so assistive tech lands on the dialog
 	function autofocusNode(n: HTMLElement) { n.focus(); }
 
-	onMount(refresh);
+	onMount(async () => {
+		// the replace sheet has to say whether iCloud sync will undo the wipe
+		await settings.load();
+		await refresh();
+	});
 	async function refresh() {
 		const repo = getRepository();
 		const [s, t] = await Promise.all([repo.listSessions(), repo.listTemplates()]);
@@ -74,7 +79,9 @@
 			busy = true;
 			try {
 				const r = await importBackup(backup, 'merge');
-				message = `Merged — added ${r.sessions} sessions, ${r.templates} templates, ${r.exercises} exercises.`;
+				message =
+					`Merged — added ${r.sessions} sessions, ${r.templates} templates, ${r.exercises} exercises` +
+					(r.bodyweights ? `, ${r.bodyweights} body-weight entries.` : '.');
 				await refresh();
 			} catch (err) {
 				message = err instanceof Error ? `Import failed — ${err.message}` : 'Import failed.';
@@ -98,7 +105,9 @@
 			}
 			const r = await importBackup(pending.backup, 'replace');
 			pending = null;
-			message = `Replaced — loaded ${r.sessions} sessions, ${r.templates} templates.`;
+			message =
+				`Replaced — loaded ${r.sessions} sessions, ${r.templates} templates` +
+				(r.bodyweights ? `, ${r.bodyweights} body-weight entries.` : '.');
 			await refresh();
 		} catch (err) {
 			message = err instanceof Error ? `Import failed — ${err.message}` : 'Import failed.';
@@ -144,7 +153,7 @@
 					<div class="row" style="justify-content:space-between">
 						<div style="display:flex;align-items:center;gap:11px">
 							<Icon name="doc" size={19} color="var(--ink-2)" />
-							<div><div style="font-weight:500">Full backup · JSON</div><div class="txt-sm">everything — templates, sessions, settings</div></div>
+							<div><div style="font-weight:500">Full backup · JSON</div><div class="txt-sm">everything — templates, sessions, body weight, settings</div></div>
 						</div>
 						<Button size="medium" variant="dark" onclick={doExportJSON}><Icon name="download" size={16} color="#fff" />Export</Button>
 					</div>
@@ -199,8 +208,24 @@
 			<div class="h-card" id="replace-title" style="font-size:calc(var(--dt-base)*19/17);margin-bottom:6px">Replace all data?</div>
 			<div class="txt" style="margin-bottom:14px">
 				This wipes your current <b style="color:var(--ink)">{counts.sessions} sessions</b> and
-				<b style="color:var(--ink)">{counts.templates} templates</b>, then loads
-				<span class="mono">{pending.name}</span>. This can't be undone.
+				<b style="color:var(--ink)">{counts.templates} templates</b>{#if pending.backup.bodyweights} and your
+					<b style="color:var(--ink)">body-weight log</b>{/if}, then loads
+				<span class="mono">{pending.name}</span>.
+			</div>
+			<!-- Honest about SCOPE. The wipe is local: clearAll() removes the rows outright
+			     rather than tombstoning them, so with iCloud sync on the next pull sees
+			     every wiped id as "missing locally" and writes it back. We deliberately do
+			     NOT propagate the wipe as deletes to other devices — restoring a backup is
+			     a device-local repair, not a command to erase the user's other phones — so
+			     the sheet says so instead of pretending otherwise. -->
+			<div class="txt" style="margin-bottom:14px">
+				{#if settings.current.cloudSyncEnabled}
+					<b style="color:var(--warn)">iCloud sync is on.</b> This only replaces the data on
+					<b style="color:var(--ink)">this device</b> — a later sync can pull the wiped sessions and templates
+					back from your other devices. Turn iCloud sync off in Settings first if you want the replace to stick.
+				{:else}
+					This only replaces the data on <b style="color:var(--ink)">this device</b>, and it can't be undone.
+				{/if}
 			</div>
 			<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;background:var(--surface-2);border-radius:12px;margin-bottom:16px;cursor:pointer">
 				<span class="setcheck {exportFirst ? 'done' : ''}" style="width:22px;height:22px" aria-hidden="true">

@@ -3,26 +3,29 @@
 	import { goto } from '$app/navigation';
 	import { ensureSeeded, getRepository } from '$lib/db';
 	import { sessionVolume, sessionSetCount, sessionDurationSec } from '$lib/compute';
-	import { relativeDay, hhmm, durationLabel, volK } from '$lib/format';
+	import { hhmm, durationLabel, volK, hoursMinutes } from '$lib/format';
+	import { dayWithYear } from '$lib/historyFormat';
 	import type { WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import Kpi from '$lib/components/Kpi.svelte';
 
 	let sessions = $state<WorkoutSession[]>([]);
+	let loaded = $state(false);
 
 	onMount(async () => {
 		await ensureSeeded();
 		sessions = await getRepository().listSessions();
+		loaded = true;
 	});
 
 	const weekAgo = Date.now() - 7 * 86_400_000;
 	const thisWeek = $derived(sessions.filter((s) => Date.parse(s.startedAt) >= weekAgo).length);
 	const totalSec = $derived(sessions.reduce((a, s) => a + (sessionDurationSec(s) ?? 0), 0));
 	const totalVol = $derived(sessions.reduce((a, s) => a + sessionVolume(s), 0));
-	const totalTime = $derived(
-		`${Math.floor(totalSec / 3600)}:${String(Math.round((totalSec % 3600) / 60)).padStart(2, '0')}`
-	);
+	// hoursMinutes, not a hand-rolled floor/round pair: flooring the hours while
+	// rounding the minutes independently prints "11:60" for anything from 11h59m30s.
+	const totalTime = $derived(hoursMinutes(totalSec));
 </script>
 
 <div class="screen">
@@ -46,6 +49,13 @@
 		</div>
 
 		<div class="pad" style="display:flex;flex-direction:column;gap:10px;padding-bottom:28px">
+			<!-- the seed no longer fabricates demo history, so a fresh install genuinely
+			     lands here with nothing — say so rather than showing a blank column -->
+			{#if loaded && sessions.length === 0}
+				<div class="card card-pad txt" style="text-align:center">
+					No workouts logged yet — finish one and it'll show up here.
+				</div>
+			{/if}
 			{#each sessions as s (s.id)}
 				{@const adhoc = s.sourceTemplateId == null}
 				<button
@@ -60,7 +70,7 @@
 							{#if adhoc}<span class="chip" style="font-size:calc(var(--dt-base)*10/17);padding:2px 7px">ad-hoc</span>{/if}
 						</div>
 						<div class="txt-sm mono" style="margin-top:3px">
-							{relativeDay(s.startedAt)} · {hhmm(s.startedAt)} · {durationLabel(sessionDurationSec(s) ?? 0)}
+							{dayWithYear(s.startedAt)} · {hhmm(s.startedAt)} · {durationLabel(sessionDurationSec(s) ?? 0)}
 						</div>
 						<div style="display:flex;gap:12px;margin-top:7px;align-items:center">
 							<span class="txt-sm"><span class="num" style="color:var(--ink)">{sessionSetCount(s)}</span> sets</span>

@@ -7,7 +7,10 @@ import {
   sessionDurationSec,
   cardioDistanceKm,
 } from "$lib/compute";
-import { kg, volK, mmss, relativeDay } from "$lib/format";
+import { kg, volK, mmss } from "$lib/format";
+// PR dates are ALL-TIME, so they can be years old — dayWithYear keeps "Sat 31 May"
+// from meaning two different years (relativeDay never prints one).
+import { dayWithYear } from "$lib/historyFormat";
 
 export type TrendWindow = "4w" | "12w" | "all";
 export const WINDOW_WEEKS: Record<TrendWindow, number> = {
@@ -240,9 +243,18 @@ export function progression(
   win: TrendWindow,
   now = new Date()
 ): Progression {
-  const list = inWindow(sessions, win, now).filter((s) =>
-    s.exercises.some((e) => e.exerciseId === ex.id)
-  );
+  const has = (s: WorkoutSession) =>
+    s.exercises.some((e) => e.exerciseId === ex.id);
+  // The CHART is windowed — that's the whole point of the window control.
+  const list = inWindow(sessions, win, now).filter(has);
+  // The PRs are NOT. A "personal record" that silently resets when you flip to 4w
+  // isn't a record, and it used to disagree with the all-time numbers the Trends PR
+  // feed shows for the same lift. They are computed over every session and LABELLED
+  // all-time (see the `prs` block below) so the scope is stated, not guessed.
+  // Ascending, so ties keep the FIRST time the best was hit.
+  const allTime = [...sessions]
+    .filter(has)
+    .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
   const bw = ex.loadType === "bodyweight";
   const isTime = ex.trackingType === "time_hold";
   const isCardio = ex.trackingType === "cardio";
@@ -265,25 +277,21 @@ export function progression(
     bestHold = 0,
     bestHoldDate = "";
 
+  // --- chart series: the windowed sessions, in order ---
   for (const s of list) {
     const le = s.exercises.find((e) => e.exerciseId === ex.id)!;
     const sets = le.sets.filter((x) => x.completed);
     if (!sets.length) continue;
     labels.push(md(new Date(s.startedAt)));
     if (isTime) {
-      const hold = Math.max(...sets.map((x) => x.durationSec ?? 0));
-      topset.push(hold);
+      topset.push(Math.max(...sets.map((x) => x.durationSec ?? 0)));
       reps.push(0);
       e1rm.push(0);
-      if (hold > bestHold) (bestHold = hold), (bestHoldDate = s.startedAt);
     } else if (bw) {
       const r = Math.max(...sets.map((x) => x.reps ?? 0));
-      const total = sets.reduce((a, x) => a + (x.reps ?? 0), 0);
       topset.push(r);
       reps.push(r);
       e1rm.push(0);
-      if (r > bestReps) (bestReps = r), (bestRepsDate = s.startedAt);
-      if (total > bestVol) (bestVol = total), (bestVolDate = s.startedAt);
     } else if (isCardio) {
       topset.push(
         Math.round(Math.max(...sets.map((x) => x.timeSec ?? 0)) / 60)
@@ -293,6 +301,36 @@ export function progression(
     } else {
       let topW = 0,
         topWReps = 0,
+        e = 0;
+      for (const x of sets) {
+        const w = x.weight ?? 0,
+          r = x.reps ?? 0;
+        if (w > topW) (topW = w), (topWReps = r);
+        const e1 = est1RM(w, r);
+        if (e1 > e) e = e1;
+      }
+      topset.push(topW);
+      e1rm.push(Math.round(e));
+      reps.push(topWReps);
+    }
+  }
+
+  // --- records: every session ever, regardless of the window ---
+  for (const s of allTime) {
+    const le = s.exercises.find((e) => e.exerciseId === ex.id)!;
+    const sets = le.sets.filter((x) => x.completed);
+    if (!sets.length) continue;
+    if (isTime) {
+      const hold = Math.max(...sets.map((x) => x.durationSec ?? 0));
+      if (hold > bestHold) (bestHold = hold), (bestHoldDate = s.startedAt);
+    } else if (bw) {
+      const r = Math.max(...sets.map((x) => x.reps ?? 0));
+      const total = sets.reduce((a, x) => a + (x.reps ?? 0), 0);
+      if (r > bestReps) (bestReps = r), (bestRepsDate = s.startedAt);
+      if (total > bestVol) (bestVol = total), (bestVolDate = s.startedAt);
+    } else if (!isCardio) {
+      // cardio emits no PR card here — nothing to track
+      let topW = 0,
         e = 0,
         vol = 0,
         mReps = 0,
@@ -301,14 +339,11 @@ export function progression(
         const w = x.weight ?? 0,
           r = x.reps ?? 0;
         vol += setVolume(x);
-        if (w > topW) (topW = w), (topWReps = r);
+        if (w > topW) topW = w;
         const e1 = est1RM(w, r);
         if (e1 > e) e = e1;
         if (r > mReps) (mReps = r), (mRepsW = w);
       }
-      topset.push(topW);
-      e1rm.push(Math.round(e));
-      reps.push(topWReps);
       if (topW > bestW) (bestW = topW), (bestWDate = s.startedAt);
       if (e > best1) (best1 = e), (best1Date = s.startedAt);
       if (mReps > bestReps)
@@ -317,58 +352,61 @@ export function progression(
     }
   }
 
+  // Labels carry the scope. Without "All-time" these read as claims about the chart
+  // above them, which is windowed — that mismatch is what made the same lift show two
+  // different "personal records" on two screens.
   const prs: PR[] = [];
   if (hasWeight) {
     if (bestW)
       prs.push({
         ic: "dumbbell",
-        l: "Heaviest weight",
+        l: "All-time heaviest",
         v: `${kg(bestW)} kg`,
-        when: relativeDay(bestWDate, now),
+        when: dayWithYear(bestWDate, now),
       });
     if (best1)
       prs.push({
         ic: "trend",
-        l: "Best est. 1RM",
+        l: "All-time best est. 1RM",
         v: `${Math.round(best1)} kg`,
-        when: relativeDay(best1Date, now),
+        when: dayWithYear(best1Date, now),
       });
     if (bestReps)
       prs.push({
         ic: "arrowU",
-        l: "Most reps",
+        l: "All-time most reps",
         v: `${bestReps} @ ${kg(bestRepsW)} kg`,
-        when: relativeDay(bestRepsDate, now),
+        when: dayWithYear(bestRepsDate, now),
       });
     if (bestVol)
       prs.push({
         ic: "chart",
-        l: "Top session volume",
+        l: "All-time top session volume",
         v: `${volK(bestVol)} kg`,
-        when: relativeDay(bestVolDate, now),
+        when: dayWithYear(bestVolDate, now),
       });
   } else if (bw) {
     if (bestReps)
       prs.push({
         ic: "arrowU",
-        l: "Most reps",
+        l: "All-time most reps",
         v: `${bestReps} reps`,
-        when: relativeDay(bestRepsDate, now),
+        when: dayWithYear(bestRepsDate, now),
       });
     if (bestVol)
       prs.push({
         ic: "chart",
-        l: "Most reps in a session",
+        l: "All-time most reps in a session",
         v: `${bestVol} reps`,
-        when: relativeDay(bestVolDate, now),
+        when: dayWithYear(bestVolDate, now),
       });
   } else if (isTime) {
     if (bestHold)
       prs.push({
         ic: "clock",
-        l: "Longest hold",
+        l: "All-time longest hold",
         v: mmss(bestHold),
-        when: relativeDay(bestHoldDate, now),
+        when: dayWithYear(bestHoldDate, now),
       });
   }
 
@@ -406,6 +444,10 @@ export interface PRFeed {
   when: string;
   date: string;
 }
+/** ALL-TIME bests per exercise, newest-achieved first — deliberately NOT windowed,
+ *  and deliberately not given a `win` parameter. A record that shrinks when you flip
+ *  the Trends window isn't a record. progression()'s `prs` uses the same all-time
+ *  scope for the same reason; keep the two in step. */
 export function recentPRs(
   sessions: WorkoutSession[],
   byId: Map<string, Exercise>,
@@ -468,7 +510,7 @@ export function recentPRs(
         : isCardio
         ? `+${dist(d)}`
         : `+${kg(d)}`,
-      when: relativeDay(date, now),
+      when: dayWithYear(date, now),
       date,
     });
   }

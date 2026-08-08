@@ -1,8 +1,12 @@
-// Seeding must survive being INTERRUPTED. It writes exercises, then templates,
-// then sample sessions in separate transactions, so an app kill or reload between
-// those phases leaves the database half-populated. The guard therefore has to mean
-// "a seed finished", not "some data exists" — the latter short-circuits every later
-// launch and the templates never arrive.
+// Seeding must survive being INTERRUPTED. It writes exercises, then templates, in
+// separate transactions, so an app kill or reload between those phases leaves the
+// database half-populated. The guard therefore has to mean "a seed finished", not
+// "some data exists" — the latter short-circuits every later launch and the
+// templates never arrive.
+//
+// It also must NOT write workout history any more: the demo sessions it used to
+// generate were indistinguishable from real ones. The id set they were minted with
+// survives only so Settings can purge them from existing installs.
 import { describe, it, expect, beforeEach } from 'vitest';
 // These run under the node environment, which has no localStorage. seedDatabase
 // guards with `typeof localStorage !== 'undefined'` so it stays SSR-safe, but the
@@ -17,7 +21,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 	},
 	configurable: true
 });
-import { seedDatabase } from './seed';
+import { seedDatabase, demoSessionIds, isDemoSessionId } from './seed';
 import type { Repository } from './repository';
 import type { Exercise, Template, WorkoutSession } from '$lib/types';
 
@@ -53,12 +57,17 @@ function fakeRepo() {
 describe('seedDatabase', () => {
 	beforeEach(() => localStorage.clear());
 
-	it('populates exercises, templates and sessions on a clean database', async () => {
+	it('populates exercises and templates on a clean database', async () => {
 		const f = fakeRepo();
 		await seedDatabase(f.repo);
 		expect(f.exercises.length).toBeGreaterThan(0);
 		expect(f.templates.length).toBeGreaterThan(0);
-		expect(f.sessions.length).toBeGreaterThan(0);
+	});
+
+	it('writes NO workout history — a new install starts with an empty log', async () => {
+		const f = fakeRepo();
+		await seedDatabase(f.repo);
+		expect(f.sessions).toEqual([]);
 	});
 
 	it('finishes a seed that was interrupted after the exercises were written', async () => {
@@ -77,9 +86,8 @@ describe('seedDatabase', () => {
 
 		await seedDatabase(f.repo);
 
-		// the old guard returned early here, so these stayed empty forever
+		// the old guard returned early here, so this stayed empty forever
 		expect(f.templates.length).toBeGreaterThan(0);
-		expect(f.sessions.length).toBeGreaterThan(0);
 	});
 
 	it('skips the work once a seed has completed', async () => {
@@ -102,5 +110,46 @@ describe('seedDatabase', () => {
 		await seedDatabase(f.repo);
 
 		expect(f.templates.find((t) => t.id === edited.id)?.name).toBe('My Renamed Split');
+	});
+});
+
+// The "Remove sample data" action in Settings deletes by this predicate, so a false
+// positive destroys a real workout. It must recognise every id the old seed minted
+// and nothing else.
+describe('isDemoSessionId', () => {
+	it('lists exactly the 36 ids the retired demo history created', () => {
+		const ids = demoSessionIds();
+		expect(ids).toHaveLength(36);
+		expect(new Set(ids).size).toBe(36); // no duplicates — 36 distinct sessions
+	});
+
+	it('recognises the round-robin ids the generator actually produced', () => {
+		// week 11 opened the cycle: chest-tricep, back-bicep, shoulder-core…
+		expect(isDemoSessionId('sess-chest-tricep-w11-d2')).toBe(true);
+		expect(isDemoSessionId('sess-back-bicep-w11-d4')).toBe(true);
+		expect(isDemoSessionId('sess-shoulder-core-w11-d6')).toBe(true);
+		// …and week 10 continued it from `legs`, not from the top
+		expect(isDemoSessionId('sess-legs-w10-d2')).toBe(true);
+		expect(isDemoSessionId('sess-legs-w0-d6')).toBe(true);
+	});
+
+	it('rejects lookalike ids the generator never minted', () => {
+		expect(isDemoSessionId('sess-legs-w11-d2')).toBe(false); // wrong template for that slot
+		expect(isDemoSessionId('sess-chest-tricep-w12-d2')).toBe(false); // week 12 never existed
+		expect(isDemoSessionId('sess-chest-tricep-w11-d3')).toBe(false); // only days 2/4/6
+		expect(isDemoSessionId('sess-chest-tricep-w11-d2-copy')).toBe(false);
+	});
+
+	it('rejects a real workout id', () => {
+		expect(isDemoSessionId('V1StGXR8_Z5jdHi6B-myT')).toBe(false);
+		expect(isDemoSessionId('')).toBe(false);
+	});
+
+	it('matches the ids the seeded sessions carried', () => {
+		// every generated id is `sess-<template>-w<0..11>-d<2|4|6>`
+		for (const id of demoSessionIds()) {
+			expect(id).toMatch(/^sess-(chest-tricep|back-bicep|shoulder-core|legs)-w(1[01]|[0-9])-d[246]$/);
+			expect(isDemoSessionId(id)).toBe(true);
+		}
 	});
 });

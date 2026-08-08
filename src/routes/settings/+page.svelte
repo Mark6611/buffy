@@ -7,6 +7,8 @@
 	import { whoop } from '$lib/stores/whoop.svelte';
 	import { runCloudSync, LAST_CLOUD_SYNC_KEY } from '$lib/cloudSync';
 	import { exportJSON } from '$lib/data';
+	import { getRepository } from '$lib/db';
+	import { isDemoSessionId } from '$lib/db/seed';
 	import { relativeDay } from '$lib/format';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -18,6 +20,7 @@
 	onMount(() => {
 		settings.load();
 		lastSync = localStorage.getItem(LAST_CLOUD_SYNC_KEY);
+		void countSampleSessions();
 	});
 
 	const s = $derived(settings.current);
@@ -120,6 +123,51 @@
 		} finally {
 			exporting = false;
 		}
+	}
+
+	// --- Sample data ---------------------------------------------------------
+	// Early installs were seeded with 36 fabricated workouts (the seed no longer
+	// writes them). They're welded into History and skew every stat, so offer a
+	// one-tap purge — but ONLY for sessions whose id came from that generator, so a
+	// real workout can never be caught by it. deleteSession tombstones, which means
+	// the removal also propagates to the user's other devices and survives a
+	// reinstall instead of being resurrected by the next iCloud pull.
+	let sampleCount = $state(0);
+	let confirmSample = $state(false);
+	let purging = $state(false);
+	let dataMessage = $state('');
+	let sampleError = $state('');
+
+	async function countSampleSessions() {
+		try {
+			sampleCount = (await getRepository().listSessions()).filter((s) => isDemoSessionId(s.id)).length;
+		} catch {
+			sampleCount = 0; // storage unavailable — just don't offer the action
+		}
+	}
+
+	async function removeSampleData() {
+		if (purging) return;
+		purging = true;
+		sampleError = '';
+		try {
+			const repo = getRepository();
+			const ids = (await repo.listSessions()).filter((s) => isDemoSessionId(s.id)).map((s) => s.id);
+			for (const id of ids) await repo.deleteSession(id);
+			dataMessage = `Removed ${ids.length} sample ${ids.length === 1 ? 'workout' : 'workouts'}.`;
+			await countSampleSessions();
+			confirmSample = false;
+		} catch (e) {
+			// keep the sheet up so the failure is visible where the tap happened
+			sampleError = e instanceof Error ? e.message : 'Could not remove the sample data.';
+		} finally {
+			purging = false;
+		}
+	}
+
+	// move focus into the confirm sheet so assistive tech lands on the dialog
+	function autofocusNode(n: HTMLElement) {
+		n.focus();
 	}
 </script>
 
@@ -354,13 +402,53 @@
 						<div style="font-weight:500">Export data</div>
 						<Icon name="share" size={18} color="var(--ink-3)" />
 					</button>
+					{#if sampleCount > 0}
+						<div class="divider"></div>
+						<button
+							class="row"
+							style="justify-content:space-between;width:100%;background:transparent;border:none;text-align:left"
+							onclick={() => (confirmSample = true)}
+						>
+							<div>
+								<div style="font-weight:500;color:var(--warn)">Remove sample data</div>
+								<div class="txt-sm">{sampleCount} demo {sampleCount === 1 ? 'workout' : 'workouts'} from the first launch</div>
+							</div>
+							<Icon name="trash" size={18} color="var(--warn)" />
+						</button>
+					{/if}
 					<div class="divider"></div>
 					<a class="row" href="/privacy" style="justify-content:space-between;width:100%;text-decoration:none;color:inherit">
 						<div style="font-weight:500">Privacy Policy</div>
 						<Icon name="chevR" size={16} color="var(--ink-3)" />
 					</a>
 				</div>
+				{#if dataMessage}
+					<div class="txt-sm" style="margin-top:8px;padding-inline:4px;color:var(--ink-2)">{dataMessage}</div>
+				{/if}
 			</div>
 		</div>
 	</div>
+
+	{#if confirmSample}
+		<button class="sheet-backdrop" aria-label="Cancel" onclick={() => (confirmSample = false)}></button>
+		<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sample-title" tabindex="-1" use:autofocusNode>
+			<div class="sheet-grip" aria-hidden="true"></div>
+			<span class="stat-ic" style="width:46px;height:46px;background:var(--warn-tint);margin-bottom:14px"><Icon name="trash" size={22} color="var(--warn)" /></span>
+			<div class="h-card" id="sample-title" style="font-size:calc(var(--dt-base)*19/17);margin-bottom:6px">Remove sample data?</div>
+			<div class="txt" style="margin-bottom:16px">
+				Deletes the <b style="color:var(--ink)">{sampleCount} demo {sampleCount === 1 ? 'workout' : 'workouts'}</b>
+				Buffy generated on its first launch. Your own workouts, templates and exercises are untouched — only sessions
+				created by that generator are matched.
+			</div>
+			<div style="display:flex;gap:10px">
+				<Button variant="bordered" style="flex:1" onclick={() => (confirmSample = false)} disabled={purging}>Cancel</Button>
+				<Button style="flex:1.3;background:var(--warn);color:#fff" onclick={removeSampleData} disabled={purging}>
+					{purging ? 'Removing…' : 'Remove'}
+				</Button>
+			</div>
+			{#if sampleError}
+				<div class="txt-sm" style="margin-top:10px;padding-inline:4px;color:var(--warn)">{sampleError}</div>
+			{/if}
+		</div>
+	{/if}
 </div>

@@ -2,7 +2,7 @@
 import { getRepository } from '$lib/db';
 import { setVolume } from '$lib/compute';
 import { saveTextFile, writeAutoBackup } from '$lib/native';
-import type { Exercise, Template, WorkoutSession, Settings } from '$lib/types';
+import type { Exercise, Template, WorkoutSession, Settings, BodyWeightEntry } from '$lib/types';
 
 export interface BuffyBackup {
 	app: 'buffy';
@@ -12,6 +12,21 @@ export interface BuffyBackup {
 	templates: Template[];
 	sessions: WorkoutSession[];
 	settings: Settings;
+	/**
+	 * Body-weight series. OPTIONAL because every backup written before this field
+	 * existed simply omits it — the importer must keep loading those unchanged, so
+	 * this stays additive and `version` stays 1 (nothing reads it, and an older
+	 * build handed a newer file just ignores the extra key).
+	 *
+	 * Body weight is health data and is deliberately kept OUT of iCloud/CloudKit
+	 * sync (5.1.3(ii), see repository.ts) — but that left it as the only dataset with
+	 * no recovery path at all, while this screen promises an export keeps you safe.
+	 * The backup is a user-initiated, on-device file, not a sync channel, so it is in.
+	 * That also means it rides autoBackup()'s Documents write (and therefore the
+	 * device's own iCloud backup, per native.ts) — same as the session-level health
+	 * fields the backup has always carried.
+	 */
+	bodyweights?: BodyWeightEntry[];
 }
 
 export type ImportMode = 'merge' | 'replace';
@@ -30,13 +45,23 @@ function n(x: number | undefined): string {
 
 export async function buildBackup(): Promise<BuffyBackup> {
 	const repo = getRepository();
-	const [exercises, templates, sessions, settings] = await Promise.all([
+	const [exercises, templates, sessions, settings, bodyweights] = await Promise.all([
 		repo.listExercises(),
 		repo.listTemplates(),
 		repo.listSessions(),
-		repo.getSettings()
+		repo.getSettings(),
+		repo.listBodyWeights()
 	]);
-	return { app: 'buffy', version: 1, exportedAt: new Date().toISOString(), exercises, templates, sessions, settings };
+	return {
+		app: 'buffy',
+		version: 1,
+		exportedAt: new Date().toISOString(),
+		exercises,
+		templates,
+		sessions,
+		settings,
+		bodyweights
+	};
 }
 
 /** Automatic post-workout backup — native only (web/PWA uses manual export). */
@@ -110,7 +135,10 @@ export function parseBackup(text: string): BuffyBackup {
 		b.app !== 'buffy' ||
 		!isRecordArray(b.sessions) ||
 		!isRecordArray(b.exercises) ||
-		(b.templates !== undefined && !isRecordArray(b.templates))
+		(b.templates !== undefined && !isRecordArray(b.templates)) ||
+		// same optional-array guard as templates: absent is fine (older backups),
+		// present-but-not-an-array must fail HERE, before replace-mode wipes anything
+		(b.bodyweights !== undefined && !isRecordArray(b.bodyweights))
 	) {
 		throw new Error('That doesn’t look like a Buffy backup.');
 	}
@@ -121,6 +149,7 @@ export interface ImportResult {
 	exercises: number;
 	templates: number;
 	sessions: number;
+	bodyweights: number;
 }
 
 export async function importBackup(b: BuffyBackup, mode: ImportMode): Promise<ImportResult> {
@@ -140,10 +169,32 @@ export async function importBackup(b: BuffyBackup, mode: ImportMode): Promise<Im
 	const tpIds = new Set(exTp.map((t) => t.id));
 	const seIds = new Set(exSe.map((s) => s.id));
 
-	const res: ImportResult = { exercises: 0, templates: 0, sessions: 0 };
+	const res: ImportResult = { exercises: 0, templates: 0, sessions: 0, bodyweights: 0 };
 	for (const e of b.exercises ?? []) if (mode === 'replace' || !exIds.has(e.id)) (await repo.upsertExercise(e), res.exercises++);
 	for (const t of b.templates ?? []) if (mode === 'replace' || !tpIds.has(t.id)) (await repo.upsertTemplate(t), res.templates++);
 	for (const s of b.sessions ?? []) if (mode === 'replace' || !seIds.has(s.id)) (await repo.upsertSession(s), res.sessions++);
+
+	// Body weight is restored HERE rather than alongside the three tables above,
+	// because clearAll() deliberately doesn't touch it: the bodyweights table sits
+	// outside the synced set (local-only health data), so a replace has to empty it
+	// explicitly or "replace" would silently degrade into a merge for this one series.
+	// Merge mode dedupes by id; addBodyWeight is a put(), so re-importing the same
+	// file is idempotent either way.
+	//
+	// A file written BEFORE the field existed has no `bodyweights` key at all — that
+	// is "this backup says nothing about body weight", not "this backup says you have
+	// none", so replace leaves the existing series alone rather than destroying the
+	// one dataset the old file could never have carried.
+	if (b.bodyweights !== undefined) {
+		if (mode === 'replace') {
+			for (const e of await repo.listBodyWeights()) await repo.deleteBodyWeight(e.id);
+			for (const e of b.bodyweights) (await repo.addBodyWeight(e), res.bodyweights++);
+		} else {
+			const bwIds = new Set((await repo.listBodyWeights()).map((e) => e.id));
+			for (const e of b.bodyweights) if (!bwIds.has(e.id)) (await repo.addBodyWeight(e), res.bodyweights++);
+		}
+	}
+
 	if (mode === 'replace' && b.settings) await repo.saveSettings(b.settings);
 	return res;
 }
