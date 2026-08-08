@@ -70,7 +70,9 @@ test('a quick-log workout can be saved as a new template', async ({ page }) => {
 	await expect(page).toHaveURL(/\/history\//);
 
 	await page.goto('/');
-	await expect(page.getByRole('button', { name: /My New Split/ })).toBeVisible();
+	// .first(): each home card is now a card button PLUS a trailing "Start <name>"
+	// button, so the template name matches two roles. The card is first in the DOM.
+	await expect(page.getByRole('button', { name: /My New Split/ }).first()).toBeVisible();
 });
 
 async function swipeOpen(page: import('@playwright/test').Page, rowLocator: import('@playwright/test').Locator) {

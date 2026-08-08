@@ -2,6 +2,7 @@
 // testable; the actual native write happens in $lib/native (no-ops on web).
 import { kpis } from '$lib/analytics';
 import { writeWidgetSnapshot } from '$lib/native';
+import { templateStats } from '$lib/templateStats';
 import type { Template, WorkoutSession } from '$lib/types';
 
 export interface WidgetSnapshot {
@@ -20,17 +21,12 @@ export function buildWidgetSnapshot(sessions: WorkoutSession[], templates: Templ
 	let isNext = false;
 
 	if (templates.length > 0) {
-		const lastUsed = new Map<string, number>();
-		for (const s of sessions) {
-			if (!s.sourceTemplateId) continue;
-			const t = Date.parse(s.startedAt);
-			const prev = lastUsed.get(s.sourceTemplateId);
-			if (prev == null || t > prev) lastUsed.set(s.sourceTemplateId, t);
-		}
+		// Shared with the home cards — see $lib/templateStats.
+		const stats = templateStats(sessions);
 		let pick: Template | null = null;
 		let pickTime = Infinity;
 		for (const t of templates) {
-			const t0 = lastUsed.get(t.id) ?? -Infinity;
+			const t0 = stats.get(t.id)?.lastPerformedMs ?? -Infinity;
 			if (t0 < pickTime) {
 				pickTime = t0;
 				pick = t;

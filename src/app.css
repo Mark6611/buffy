@@ -1122,6 +1122,73 @@ input.inp.rest-inp {
   color: var(--accent-ink);
 }
 
+/* ── Home template card: stretched link + Start ─────────────────────────────
+   Starting a saved workout used to cost two taps and a page load, but the card
+   was one big <button> and a <button> cannot nest inside another (invalid HTML;
+   WebKit drops the inner one). Giving Start its own COLUMN beside the card cost
+   ~56px of card width, which wrapped the template name on a 375pt phone.
+   So: the card is a plain div, navigation is a transparent overlay button
+   stretched across it, and Start is a chip in the existing tag row. */
+.tpl-card {
+  position: relative;
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+}
+.tpl-open {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--r-card);
+}
+/* The overlay is the only POSITIONED box in the card, so it paints above the
+   card's static content (harmless — it is transparent) but below anything that
+   positions itself. That is how Start wins the tap without a z-index war. */
+.tpl-card .tpl-start {
+  position: relative;
+  z-index: 1;
+  padding: 5px 11px 5px 9px;
+  font-size: calc(var(--dt-base) * 12 / 17);
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
+  color: #fff;
+}
+.tpl-card .tpl-start:active {
+  background: var(--accent-press);
+  border-color: var(--accent-press);
+}
+.tpl-card .tpl-start:disabled {
+  opacity: 0.45;
+}
+
+/* ── Skeleton placeholders ──────────────────────────────────────────────────
+   For lists whose shape is known before their data arrives (the home template
+   list loads from an async onMount). A shimmer rather than a spinner, so the
+   screen shows what is coming instead of a blank column under a heading.
+   Movement IS the whole effect here, so reduced motion drops it to a flat tint
+   rather than cross-fading — see the REDUCED MOTION block. */
+.skel {
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--line-soft) 37%,
+    var(--surface-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: skel-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes skel-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
 .hero {
   height: 200px;
   border-radius: 18px;
@@ -1306,5 +1373,11 @@ a.chip::after {
      author declaration can beat. */
   .settable tbody tr {
     transition: none !important;
+  }
+  /* No cross-fade substitute: a skeleton's job is "content is coming", and the
+     static tint still says that. An infinite shimmer is exactly the looping
+     motion this setting exists to stop. */
+  .skel {
+    animation: none;
   }
 }

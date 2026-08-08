@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import '../app.css';
 	// Self-hosted fonts — bundled into the app so they load instantly and work
 	// offline (no Google Fonts request, which blanks the screen inside a WebView).
@@ -53,8 +54,15 @@
 		requestNotificationPermission();
 		// Resume an in-progress workout after an app restart / WebView purge, and
 		// drop the user straight back into it.
+		//
+		// COLD LAUNCH ONLY, and only from the home screen. This onMount runs once per
+		// app boot, so it never fired on in-app navigation — but it did fire for every
+		// cold entry, including deep links (the buffy:// Whoop callback, a widget or
+		// notification tap, a shared /history/<id> URL), silently swallowing the
+		// destination. Landing anywhere other than "/" now means the user asked for
+		// that screen; home carries a "Workout in progress" bar to get back.
 		workout.restore();
-		if (workout.active) goto('/workout');
+		if (workout.active && $page.url.pathname === '/') goto('/workout');
 
 		void maybeCloudSync();
 		void recovery.refresh();
