@@ -16,6 +16,10 @@ function loggedExerciseToTemplateExercise(le: LoggedExercise, exById: Map<string
 		targetTimeSec: s.timeSec,
 		targetIncline: s.incline,
 		targetSpeed: s.speed,
+		// distance-mode cardio (erg/rower) logs metres directly — it is a first-class
+		// target like reps or weight, so it has to survive the round trip back into
+		// the template, not be silently dropped by "Update whole template".
+		targetDistanceMeters: s.distanceMeters,
 		targetRestSec: s.restTakenSec ?? ex?.defaultRestSec
 	}));
 	return { exerciseId: le.exerciseId, groupId: le.groupId ?? null, setupNote: le.setupNote, plannedSets };
@@ -58,7 +62,8 @@ export function applyWeightsOnlySync(template: Template, session: WorkoutSession
 				targetDurationSec: set.durationSec ?? ps.targetDurationSec,
 				targetTimeSec: set.timeSec ?? ps.targetTimeSec,
 				targetIncline: set.incline ?? ps.targetIncline,
-				targetSpeed: set.speed ?? ps.targetSpeed
+				targetSpeed: set.speed ?? ps.targetSpeed,
+				targetDistanceMeters: set.distanceMeters ?? ps.targetDistanceMeters
 			};
 		});
 		return { ...tex, plannedSets };

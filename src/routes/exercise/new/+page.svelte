@@ -1,18 +1,32 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import { getRepository } from '$lib/db';
 	import { newId } from '$lib/id';
 	import { workout } from '$lib/stores/workout.svelte';
 	import { editor } from '$lib/stores/editor.svelte';
 	import { EQUIP_ICON } from '$lib/icons';
 	import { mmss, parseMmss, equipLabel } from '$lib/format';
+	import { sameExerciseName } from '$lib/exerciseSearch';
 	import type { Exercise, Equipment, TrackingType, LoadType } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Button from '$lib/components/Button.svelte';
 
 	const to = $derived($page.url.searchParams.get('to') ?? 'workout');
-	let name = $state('');
+	// A swap that detours through "Create custom exercise" is still a swap: the picker
+	// forwards its slot index so we replace that exercise instead of appending a new
+	// one and leaving the old one in place. Same guard as the picker's — Number('') is
+	// 0, so a bare `?swap=` (or junk) must fall back to add mode.
+	const swapIndex = $derived.by(() => {
+		const raw = $page.url.searchParams.get('swap');
+		if (raw == null || !/^\d+$/.test(raw)) return null;
+		const n = Number(raw);
+		return n < workout.exerciseCount ? n : null;
+	});
+	// prefilled from whatever was typed in the picker's search box, so a no-match
+	// search flows straight into creating the thing you were looking for
+	let name = $state($page.url.searchParams.get('name') ?? '');
 	let equipment = $state<Equipment>('dumbbell');
 	let trackingType = $state<TrackingType>('weight_reps');
 	let perSide = $state(false);
@@ -48,9 +62,44 @@
 	];
 
 	let busy = $state(false);
+	// Read once, only so add() can warn about a name that already exists. Two rows with
+	// the same name are indistinguishable in the picker (same thumb, same equipment
+	// line), and there is no way to rename or delete a custom exercise afterwards.
+	let catalog = $state<Exercise[]>([]);
+	let dupe = $state<Exercise | null>(null);
 
-	async function add() {
+	onMount(async () => {
+		catalog = await getRepository().listExercises();
+	});
+
+	/** Hand the chosen exercise back to whatever sent us here. */
+	function handoff(ex: Exercise) {
+		if (to === 'tpl' && editor.draft) {
+			editor.addExercise(ex);
+			goto(`/template/${editor.draft.id}/edit`);
+		} else if (workout.active) {
+			if (swapIndex != null) workout.swapExercise(swapIndex, ex);
+			else workout.addExercise(ex);
+			goto('/workout');
+		} else {
+			goto('/'); // saved to the catalog; no active editor/workout to return to
+		}
+	}
+
+	function add() {
 		if (!name.trim() || busy) return; // double-tap would create two catalog entries
+		// Warn on a duplicate name, don't block it: "Incline Press" on two different
+		// machines is a legitimate pair, but an accidental second "Plank" is not.
+		const hit = catalog.find((e) => sameExerciseName(e.name, name));
+		if (hit) {
+			dupe = hit;
+			return;
+		}
+		return create();
+	}
+
+	async function create() {
+		if (!name.trim() || busy) return;
 		busy = true;
 		try {
 			const loadType: LoadType = perSide
@@ -74,15 +123,7 @@
 				defaultRestSec: restSec
 			};
 			await getRepository().upsertExercise(ex);
-			if (to === 'tpl' && editor.draft) {
-				editor.addExercise(ex);
-				goto(`/template/${editor.draft.id}/edit`);
-			} else if (workout.active) {
-				workout.addExercise(ex);
-				goto('/workout');
-			} else {
-				goto('/'); // saved to the catalog; no active editor/workout to return to
-			}
+			handoff(ex);
 		} finally {
 			busy = false;
 		}
@@ -93,14 +134,36 @@
 	<div class="topbar">
 		<button class="icon-btn" onclick={() => history.back()} aria-label="Back"><Icon name="back" size={20} /></button>
 		<div class="topbar-title">Custom Exercise</div>
-		<Button size="regular" onclick={add} disabled={busy}>Add</Button>
+		<!-- while the duplicate-name warning is up the decision lives in that card, so a
+		     disabled Add says so rather than looking like a dead tap -->
+		<Button size="regular" onclick={add} disabled={busy || dupe !== null}>Add</Button>
 	</div>
 	<div class="screen-body">
 		<div class="pad" style="padding-bottom:28px">
 			<div class="txt-sm" style="margin:6px 0 6px">NAME</div>
 			<label class="search" style="margin-bottom:16px">
-				<input style="border:none;background:transparent;flex:1;font-size:calc(var(--dt-base)*15/17);color:var(--ink)" placeholder="Exercise name" bind:value={name} />
+				<input
+					style="border:none;background:transparent;flex:1;min-width:0;font-size:calc(var(--dt-base)*15/17);color:var(--ink)"
+					placeholder="Exercise name"
+					bind:value={name}
+					oninput={() => (dupe = null)}
+				/>
 			</label>
+
+			{#if dupe}
+				<!-- A warning, not a block. "Use it" is the right answer most of the time, but
+				     same-name variants across two gyms are real, so "Create anyway" stays. -->
+				<div class="card card-pad" style="margin-bottom:16px;border-color:var(--warn)">
+					<div style="font-weight:600">Your catalog already has “{dupe.name}”</div>
+					<div class="txt-sm" style="margin-top:2px">
+						{equipLabel(dupe.equipment)} · {dupe.primaryMuscles[0] ?? 'no primary muscle'}
+					</div>
+					<div style="display:flex;gap:8px;margin-top:12px">
+						<Button size="regular" variant="bordered" style="flex:1" onclick={() => dupe && handoff(dupe)}>Use it</Button>
+						<Button size="regular" style="flex:1" onclick={create} disabled={busy}>Create anyway</Button>
+					</div>
+				</div>
+			{/if}
 
 			<div class="txt-sm" style="margin-bottom:8px">EQUIPMENT</div>
 			<!-- row-gap must clear the chips' +/-7px hit expansion, or stacked rows steal

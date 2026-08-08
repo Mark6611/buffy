@@ -26,9 +26,22 @@ const curl: Exercise = {
 	weightStep: 1,
 	defaultRestSec: 45
 };
+// distance-mode cardio: the erg/rower shape, where metres are the target that matters
+const rower: Exercise = {
+	id: 'rower',
+	name: 'Concept2 Rower',
+	equipment: 'cardio',
+	primaryMuscles: ['Back'],
+	secondaryMuscles: [],
+	trackingType: 'cardio',
+	loadType: 'total',
+	cardioMetric: 'distance',
+	defaultRestSec: 120
+};
 const exById = new Map([
 	['press', press],
-	['curl', curl]
+	['curl', curl],
+	['rower', rower]
 ]);
 
 const template: Template = {
@@ -100,6 +113,34 @@ describe('applyWeightsOnlySync', () => {
 		expect(result.exercises[0].plannedSets[1].targetWeight).toBe(12); // unchanged from template
 	});
 
+	it('updates a distance-mode cardio target and keeps the untouched one', () => {
+		const cardioTpl: Template = {
+			...template,
+			exercises: [
+				{
+					exerciseId: 'rower',
+					groupId: null,
+					plannedSets: [
+						{ targetDistanceMeters: 2000, targetTimeSec: 480, targetRestSec: 120 },
+						{ targetDistanceMeters: 2000, targetTimeSec: 480, targetRestSec: 120 }
+					]
+				}
+			]
+		};
+		const s = session({
+			exercises: [
+				{
+					exerciseId: 'rower',
+					groupId: null,
+					sets: [{ index: 0, completed: true, distanceMeters: 2500, timeSec: 600 }]
+				}
+			]
+		});
+		const result = applyWeightsOnlySync(cardioTpl, s);
+		expect(result.exercises[0].plannedSets[0].targetDistanceMeters).toBe(2500);
+		expect(result.exercises[0].plannedSets[1].targetDistanceMeters).toBe(2000); // no 2nd set logged
+	});
+
 	it('does not mutate the input template', () => {
 		const before = JSON.stringify(template);
 		applyWeightsOnlySync(template, session());
@@ -148,6 +189,21 @@ describe('applyFullSync', () => {
 		expect(result.exercises[0].plannedSets[0].targetRestSec).toBe(45); // curl's defaultRestSec
 	});
 
+	it('carries a distance-mode cardio target back into the template', () => {
+		const s = session({
+			exercises: [
+				{
+					exerciseId: 'rower',
+					groupId: null,
+					sets: [{ index: 0, completed: true, distanceMeters: 2000, timeSec: 480, restTakenSec: 120 }]
+				}
+			]
+		});
+		const result = applyFullSync(template, s, exById);
+		expect(result.exercises[0].plannedSets[0].targetDistanceMeters).toBe(2000);
+		expect(result.exercises[0].plannedSets[0].targetTimeSec).toBe(480);
+	});
+
 	it('preserves the template id and its existing superset groups', () => {
 		const grouped: Template = { ...template, groups: [{ id: 'g1', restSec: 45 }] };
 		const result = applyFullSync(grouped, session(), exById);
@@ -165,6 +221,17 @@ describe('buildTemplateFromSession', () => {
 		expect(result.groups).toEqual([]);
 		expect(result.exercises).toHaveLength(1);
 		expect(result.exercises[0].plannedSets[0].targetWeight).toBe(14);
+	});
+
+	it('keeps a rower session\'s metres when saving a quick log as a template', () => {
+		const s = session({
+			sourceTemplateId: null,
+			exercises: [
+				{ exerciseId: 'rower', groupId: null, sets: [{ index: 0, completed: true, distanceMeters: 5000, timeSec: 1200 }] }
+			]
+		});
+		const result = buildTemplateFromSession(s, exById, 'Erg Day');
+		expect(result.exercises[0].plannedSets[0].targetDistanceMeters).toBe(5000);
 	});
 
 	it('two builds from the same session get different ids', () => {
