@@ -15,6 +15,7 @@
 	import { runCloudSync } from '$lib/cloudSync';
 	import { applyFullSync, applyWeightsOnlySync, buildTemplateFromSession } from '$lib/templateSync';
 	import type { LoggedExercise, LoggedSet, Template, WorkoutSession } from '$lib/types';
+	import type { SpreadField } from '$lib/stores/workout.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { haptic } from '$lib/native';
 	import Thumb from '$lib/components/Thumb.svelte';
@@ -22,6 +23,14 @@
 	import SwipeActions from '$lib/components/SwipeActions.svelte';
 
 	onMount(() => {
+		// A child's onMount runs BEFORE its layout's, and restore() lives in the
+		// layout — so on a COLD load straight into /workout (iOS relaunching after a
+		// WebView purge, which is the case the whole resume snapshot exists for)
+		// workout.active is still false at this point and the guard below would
+		// bounce a live workout to home. restore() no-ops when a session is already
+		// in memory, so calling it here makes this page self-sufficient regardless
+		// of mount order.
+		workout.restore();
 		if (!workout.active) goto('/');
 	});
 
@@ -376,6 +385,33 @@
 	// "this exercise is all at one load" from a deliberate pyramid or drop set.
 	let weightBefore: number | undefined;
 
+	// "Apply to the rest" offer. Raised when a weight/hold/time cell is COMMITTED
+	// (onchange, not oninput — mid-typing "8" on the way to "82.5" must not prompt),
+	// and only while there is a set it would actually change. propagateWeight has
+	// usually already carried the value down, so in the common case this stays null
+	// and the row shows nothing.
+	let spread = $state<{
+		ex: number;
+		set: number;
+		field: SpreadField;
+		label: string;
+		count: number;
+	} | null>(null);
+
+	function offerSpread(ex: number, set: number, field: SpreadField, label: string) {
+		const count = workout.spreadCount(ex, set, field);
+		spread = count > 0 ? { ex, set, field, label, count } : null;
+	}
+
+	function applySpread() {
+		if (!spread) return;
+		workout.applyToUnlogged(spread.ex, spread.set, spread.field);
+		// no toast: the cells visibly change in the table right under the chip, and
+		// the chip removing itself is the confirmation. A banner would cover them.
+		spread = null;
+		void haptic('light');
+	}
+
 	function setRowStyle(ex: number, set: number): string {
 		const d = setDrag && setDrag.ex === ex && setDrag.set === set ? setDrag : null;
 		const x = d?.x ?? 0;
@@ -501,7 +537,7 @@
 										onpointercancel={setRowPointerCancel}
 									>
 										<td class="c">
-											<button class="setcheck {set.completed ? 'done' : ''}" onclick={() => workout.toggleSet(exIndex, s)} role="checkbox" aria-checked={set.completed} aria-label="Set {s + 1} of {ex?.name} complete">
+											<button class="setcheck {set.completed ? 'done' : ''}" onclick={() => { spread = null; workout.toggleSet(exIndex, s); }} role="checkbox" aria-checked={set.completed} aria-label="Set {s + 1} of {ex?.name} complete">
 												{#if set.completed}<Icon name="check" size={14} sw={2.6} color="#fff" />{/if}
 											</button>
 										</td>
@@ -509,24 +545,24 @@
 
 										{#if tt === 'cardio'}
 											{#if cardioDist}
-												<td><input class="inp" type="text" aria-label="Set {s + 1} time" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="text" aria-label="Set {s + 1} time" value={mmss(set.timeSec ?? 0)} onchange={(e) => { set.timeSec = parseMmss(e.currentTarget.value); offerSpread(exIndex, s, 'timeSec', mmss(set.timeSec ?? 0)); }} /></td>
 												<td><input class="inp" type="number" inputmode="numeric" aria-label="Set {s + 1} meters" value={set.distanceMeters ?? ''} oninput={(e) => (set.distanceMeters = numOrUndef(e.currentTarget.value))} /></td>
 												<td class="muted">{cardioSplit500Sec(set) != null ? mmss(cardioSplit500Sec(set)!) : '—'}</td>
 											{:else}
-												<td><input class="inp" type="text" aria-label="Set {s + 1} time" value={mmss(set.timeSec ?? 0)} onchange={(e) => (set.timeSec = parseMmss(e.currentTarget.value))} /></td>
+												<td><input class="inp" type="text" aria-label="Set {s + 1} time" value={mmss(set.timeSec ?? 0)} onchange={(e) => { set.timeSec = parseMmss(e.currentTarget.value); offerSpread(exIndex, s, 'timeSec', mmss(set.timeSec ?? 0)); }} /></td>
 												<td><input class="inp" type="number" aria-label="Set {s + 1} incline" value={set.incline ?? ''} oninput={(e) => (set.incline = numOrUndef(e.currentTarget.value))} /></td>
 												<td><input class="inp" type="number" aria-label="Set {s + 1} speed" value={set.speed ?? ''} oninput={(e) => (set.speed = numOrUndef(e.currentTarget.value))} /></td>
 											{/if}
 										{:else if tt === 'time_hold'}
 											{@render restCell(exIndex, s, set)}
-											<td><input class="inp" type="text" aria-label="Set {s + 1} hold time" value={mmss(set.durationSec ?? 0)} onchange={(e) => (set.durationSec = parseMmss(e.currentTarget.value))} /></td>
+											<td><input class="inp" type="text" aria-label="Set {s + 1} hold time" value={mmss(set.durationSec ?? 0)} onchange={(e) => { set.durationSec = parseMmss(e.currentTarget.value); offerSpread(exIndex, s, 'durationSec', mmss(set.durationSec ?? 0)); }} /></td>
 										{:else}
 											{@render restCell(exIndex, s, set)}
 											<td><input class="inp" type="number" aria-label="Set {s + 1} reps" value={set.reps ?? ''} onfocus={selectOnFocus} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} /></td>
 											{#if !bw}
 												<!-- on commit, the new load carries down to the later sets that still
 												     agreed with the old one (see workout.propagateWeight) -->
-												<td><input class="inp" type="number" step="0.5" aria-label="Set {s + 1} weight in kilograms" value={set.weight ?? ''} onfocus={(e) => { weightBefore = set.weight; selectOnFocus(e); }} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} onchange={() => workout.propagateWeight(exIndex, s, weightBefore)} /></td>
+												<td><input class="inp" type="number" step="0.5" aria-label="Set {s + 1} weight in kilograms" value={set.weight ?? ''} onfocus={(e) => { weightBefore = set.weight; selectOnFocus(e); }} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} onchange={() => { workout.propagateWeight(exIndex, s, weightBefore); offerSpread(exIndex, s, 'weight', `${set.weight} kg`); }} /></td>
 											{/if}
 											{#if settings.current.trackRpe}
 												<td><input class="inp" type="number" step="0.5" min="6" max="10" inputmode="decimal" aria-label="Set {s + 1} RPE" value={set.rpe ?? ''} oninput={(e) => (set.rpe = numOrUndef(e.currentTarget.value))} /></td>
@@ -536,6 +572,23 @@
 								{/each}
 							</tbody>
 						</table>
+						<!-- "Apply to the rest": raised only for THIS exercise, only after a
+						     weight/time cell is committed, and only when there is a set it would
+						     actually change. States the value and the count so the blast radius is
+						     visible before the tap — and it never touches a logged set. -->
+						{#if spread && spread.ex === exIndex}
+							<div style="display:flex;padding:9px 2px 0">
+								<button
+									class="chip accent"
+									onclick={applySpread}
+									aria-label="Apply {spread.label} to the {spread.count} unlogged {spread.count === 1 ? 'set' : 'sets'} of {ex?.name}. Logged sets are not changed."
+								>
+									<Icon name="check" size={13} sw={2.4} color="var(--accent-ink)" />
+									Apply {spread.label} to {spread.count} more {spread.count === 1 ? 'set' : 'sets'}
+								</button>
+							</div>
+						{/if}
+
 						<!-- Remove mirrors the Add/Remove pair in the template editor: the swipe
 						     gesture on a set row stays the sighted shortcut, but it is unreachable
 						     by VoiceOver/keyboard/Switch Control, so the action needs a real button. -->
@@ -543,14 +596,14 @@
 							<button
 								class="txt-sm tap-row"
 								style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
-								onclick={() => workout.addSet(exIndex)}
+								onclick={() => { spread = null; workout.addSet(exIndex); }}
 							>
 								<Icon name="plus" size={13} sw={2.2} color="var(--ink-3)" />Add set
 							</button>
 							<button
 								class="txt-sm tap-row"
 								style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
-								onclick={() => removeLastSet(exIndex)}
+								onclick={() => { spread = null; removeLastSet(exIndex); }}
 								disabled={le.sets.length <= 1}
 								aria-label="Remove last set from {ex?.name}"
 							>

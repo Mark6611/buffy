@@ -45,6 +45,13 @@ interface ResumeSnapshot {
 	restAccumSec: number;
 }
 
+/** The numeric fields "apply to the rest of this exercise" can spread. REPS are
+ *  deliberately absent: reps are what you actually managed on the day, and the
+ *  plan already prefills them — spreading one set's outcome over the rest would
+ *  overwrite the target, not fill it in. Weight and the two time metrics are the
+ *  ones that genuinely repeat across a working set. */
+export type SpreadField = 'weight' | 'durationSec' | 'timeSec';
+
 /** Outcome of a start attempt. A live workout is never overwritten — the caller
  *  decides what to offer (resume it, or cancel() then start again). */
 export type StartResult =
@@ -623,6 +630,43 @@ class WorkoutStore {
 			if (s.completed) continue; // already logged — its number is a record, not a plan
 			if (s.weight === previous) s.weight = edited.weight;
 		}
+	}
+
+	/** Sets of the same exercise that "apply to the rest" would actually change:
+	 *  not the source, not completed, and not already holding the value. Zero means
+	 *  the affordance has nothing to do and must not be offered — which is the
+	 *  common case, because propagateWeight above has usually already carried it. */
+	private spreadTargets(exIndex: number, setIndex: number, field: SpreadField): LoggedSet[] {
+		const le = this.session?.exercises[exIndex];
+		const src = le?.sets[setIndex];
+		if (!le || !src) return [];
+		const value = src[field];
+		if (value == null) return [];
+		return le.sets.filter((s, i) => i !== setIndex && !s.completed && s[field] !== value);
+	}
+
+	/** How many sets the value would reach — drives the label, so the user sees the
+	 *  blast radius before tapping. */
+	spreadCount(exIndex: number, setIndex: number, field: SpreadField): number {
+		return this.spreadTargets(exIndex, setIndex, field).length;
+	}
+
+	/** Copy one set's weight/hold/time onto every UNLOGGED set of the same exercise.
+	 *  Deliberately different from propagateWeight: that one only follows sets that
+	 *  still agreed with the old value (so a pyramid survives an edit) and runs
+	 *  automatically. This is the user explicitly asking for one number everywhere,
+	 *  so it overwrites whatever the other sets hold.
+	 *
+	 *  A COMPLETED set is never touched. Its numbers are a record of what was
+	 *  actually lifted, not a plan — rewriting them would falsify history, and the
+	 *  volume/PR math downstream reads exactly these values. Returns how many sets
+	 *  changed. */
+	applyToUnlogged(exIndex: number, setIndex: number, field: SpreadField): number {
+		const targets = this.spreadTargets(exIndex, setIndex, field);
+		const value = this.session?.exercises[exIndex]?.sets[setIndex]?.[field];
+		if (value == null) return 0;
+		for (const s of targets) s[field] = value;
+		return targets.length;
 	}
 
 	adjustRest(delta: number) {

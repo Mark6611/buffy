@@ -801,6 +801,84 @@ describe('propagateWeight', () => {
 	});
 });
 
+describe('applyToUnlogged — "apply this weight/time to the rest"', () => {
+	it('overwrites every unlogged set regardless of what it held (unlike propagateWeight)', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets[0].weight = 25;
+		sets[1].weight = 30; // a pyramid propagateWeight would deliberately preserve
+		sets[2].weight = 40;
+		expect(workout.applyToUnlogged(0, 0, 'weight')).toBe(2);
+		expect(sets.map((s) => s.weight)).toEqual([25, 25, 25]);
+	});
+
+	it('NEVER touches a logged set — its numbers are a record, not a plan', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets[0].weight = 100;
+		sets[1].weight = 60;
+		sets[2].weight = 60;
+		workout.toggleSet(0, 1); // set 2 is now history
+		const logged = { ...sets[1] };
+
+		expect(workout.applyToUnlogged(0, 0, 'weight')).toBe(1); // only set 3
+		expect(sets[1]).toEqual(logged); // byte-identical
+		expect(sets.map((s) => s.weight)).toEqual([100, 60, 100]);
+	});
+
+	it('reaches unlogged sets ABOVE the edited one too — "all that are not logged"', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets.forEach((s) => (s.weight = 20));
+		sets[2].weight = 35;
+		expect(workout.applyToUnlogged(0, 2, 'weight')).toBe(2);
+		expect(sets.map((s) => s.weight)).toEqual([35, 35, 35]);
+	});
+
+	it('spreadCount counts only what would change, so the chip stays hidden when there is nothing to do', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets.forEach((s) => (s.weight = 20));
+		// every other set already holds 20 — offering "apply 20 kg" would be a no-op
+		expect(workout.spreadCount(0, 0, 'weight')).toBe(0);
+		sets[1].weight = 22;
+		expect(workout.spreadCount(0, 0, 'weight')).toBe(1);
+	});
+
+	it('spreads hold time and cardio time, and ignores a set with no source value', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets[0].durationSec = 45;
+		expect(workout.applyToUnlogged(0, 0, 'durationSec')).toBe(2);
+		expect(sets.map((s) => s.durationSec)).toEqual([45, 45, 45]);
+
+		sets[0].timeSec = 300;
+		expect(workout.applyToUnlogged(0, 0, 'timeSec')).toBe(2);
+		expect(sets.map((s) => s.timeSec)).toEqual([300, 300, 300]);
+
+		// nothing to spread from an empty cell
+		sets[0].weight = undefined;
+		expect(workout.applyToUnlogged(0, 0, 'weight')).toBe(0);
+	});
+
+	it('stays inside its own exercise', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		workout.addExercise({ ...press, id: 'row', name: 'Row' });
+		const a = workout.session!.exercises[0].sets;
+		const b = workout.session!.exercises[1].sets;
+		b.forEach((s) => (s.weight = 60));
+		a[0].weight = 90;
+		workout.applyToUnlogged(0, 0, 'weight');
+		expect(b.map((s) => s.weight)).toEqual([60, 60, 60]);
+	});
+});
+
 describe('resume snapshot carries exercise metadata', () => {
 	it('restores the table shape on the first paint, before hydrateMeta lands', async () => {
 		// a snapshot written by the current build, for a CARDIO exercise: without meta
