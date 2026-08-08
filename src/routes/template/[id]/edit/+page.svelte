@@ -16,22 +16,56 @@
 		const n = parseFloat(v);
 		return Number.isFinite(n) ? n : undefined;
 	}
+
+	let saveError = $state('');
+
 	async function save() {
-		const tid = await editor.save();
-		if (tid) goto(`/template/${tid}`);
+		const d = editor.draft;
+		if (!d) return;
+		// Refuse to write an empty draft. Backing out of a saved template remounts this
+		// route with id='new', which mints a blank draft — without this guard, Save on
+		// that screen creates a junk "New Template" with no exercises.
+		if (!d.name.trim() || d.exercises.length === 0) {
+			saveError = 'Give the template a name and at least one exercise before saving.';
+			return;
+		}
+		saveError = '';
+		try {
+			const tid = await editor.save();
+			// replaceState: this editor entry is spent once saved. A push would leave
+			// /template/new/edit on the stack, so Back from the detail screen would land
+			// on a blank "New Template" editor.
+			if (tid) goto(`/template/${tid}`, { replaceState: true });
+		} catch (e) {
+			saveError = e instanceof Error ? e.message : 'Could not save this template. Try again.';
+		}
+	}
+
+	function removeExercise(i: number) {
+		const te = editor.draft?.exercises[i];
+		if (!te) return;
+		const name = editor.meta[te.exerciseId]?.name ?? 'this exercise';
+		if (confirm(`Remove ${name} and its ${te.plannedSets.length} planned sets?`))
+			editor.removeExercise(i);
 	}
 </script>
 
 <div class="screen">
 	<div class="topbar">
 		<button class="icon-btn" onclick={() => history.back()} aria-label="Back"><Icon name="back" size={20} /></button>
-		<div class="topbar-title">{id === 'new' ? 'New Template' : 'Edit Template'}</div>
+		<!-- editor.isNew, not id: the custom-exercise detour returns here under the
+		     draft's own uuid, which would otherwise flip the title to "Edit Template"
+		     for a template that has never been saved. -->
+		<div class="topbar-title">{editor.isNew ? 'New Template' : 'Edit Template'}</div>
 		<Button size="regular" onclick={save}>Save</Button>
 	</div>
 
 	<div class="screen-body">
 		{#if draft}
 			<div class="pad" style="padding-bottom:var(--actionbar-clear)">
+				{#if saveError}
+					<div class="txt-sm" role="alert" style="color:var(--warn);margin-bottom:10px">{saveError}</div>
+				{/if}
 				<div class="txt-sm" style="margin-bottom:6px">NAME</div>
 				<input
 					class="h-app"
@@ -49,7 +83,11 @@
 				</div>
 
 				<div style="display:flex;flex-direction:column;gap:10px">
-					{#each draft.exercises as te, i (i)}
+					<!-- keyed by OBJECT IDENTITY, not index: the rows carry live inputs, and
+					     reordering with an index key would hand row N's DOM (and whatever is
+					     half-typed in it) to the exercise shifting into slot N. Same reason the
+					     live workout keys its exercise blocks by `le`. -->
+					{#each draft.exercises as te, i (te)}
 						{@const ex = editor.meta[te.exerciseId]}
 						{@const tt = ex?.trackingType ?? 'weight_reps'}
 						{@const bw = ex?.loadType === 'bodyweight'}
@@ -72,7 +110,7 @@
 										</button>
 									{/if}
 								</div>
-								<button class="icon-btn ghost" onclick={() => editor.removeExercise(i)} aria-label="Remove {ex?.name}"><Icon name="trash" size={17} color="var(--ink-3)" /></button>
+								<button class="icon-btn ghost" onclick={() => removeExercise(i)} aria-label="Remove {ex?.name}"><Icon name="trash" size={17} color="var(--ink-3)" /></button>
 							</div>
 
 							<table class="settable editable" style="margin-top:8px" aria-label="{ex?.name} planned sets">
@@ -115,6 +153,10 @@
 								</tbody>
 							</table>
 							<div style="display:flex;gap:8px;margin-top:8px">
+								<!-- Reorder lives beside the set controls rather than in the row header:
+								     three icon buttons up there squeezed the exercise name to a wrap. -->
+								<Button size="medium" variant="bordered" iconOnly label="Move {ex?.name} up" disabled={!editor.canMove(i, -1)} onclick={() => editor.moveExercise(i, -1)}><Icon name="arrowU" size={15} /></Button>
+								<Button size="medium" variant="bordered" iconOnly label="Move {ex?.name} down" disabled={!editor.canMove(i, 1)} onclick={() => editor.moveExercise(i, 1)}><Icon name="arrowD" size={15} /></Button>
 								<Button size="medium" variant="bordered" style="flex:1" onclick={() => editor.addSet(i)}><Icon name="plus" size={15} />Add set</Button>
 								<Button size="medium" variant="bordered" style="flex:1" onclick={() => editor.removeSet(i)}><Icon name="minus" size={15} />Remove</Button>
 							</div>

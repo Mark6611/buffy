@@ -6,6 +6,7 @@
 	import { templateDerived } from '$lib/compute';
 	import { durationLabel, kg, mmss, equipLabel } from '$lib/format';
 	import { workout } from '$lib/stores/workout.svelte';
+	import { duplicateTemplate } from '$lib/stores/editor.svelte';
 	import type { Template, Exercise, TemplateExercise } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -28,9 +29,7 @@
 
 	const td = $derived(tpl ? templateDerived(tpl, byId) : null);
 
-	type Item =
-		| { type: 'single'; te: TemplateExercise }
-		| { type: 'group'; members: TemplateExercise[]; restSec: number };
+	type Item = { type: 'single'; te: TemplateExercise } | { type: 'group'; members: TemplateExercise[] };
 
 	const items = $derived.by<Item[]>(() => {
 		if (!tpl) return [];
@@ -42,7 +41,7 @@
 				const gid = te.groupId;
 				const members: TemplateExercise[] = [];
 				while (i < tpl.exercises.length && tpl.exercises[i].groupId === gid) members.push(tpl.exercises[i++]);
-				out.push({ type: 'group', members, restSec: tpl.groups.find((g) => g.id === gid)?.restSec ?? 60 });
+				out.push({ type: 'group', members });
 			} else {
 				out.push({ type: 'single', te });
 				i++;
@@ -58,12 +57,65 @@
 		const p = te.plannedSets[0] ?? {};
 		if (ex.trackingType === 'time_hold') return `${n} × ${mmss(p.targetDurationSec ?? 0)} hold`;
 		if (ex.trackingType === 'cardio') return 'cardio · log-only';
-		return `${n} × ${p.targetReps} · ${kg(p.targetWeight)}kg${ex.loadType === 'per_side' ? ' ×2' : ''}`;
+		// a template can legitimately carry no target weight (the editor no longer invents
+		// one) — print the reps alone rather than a bare "· kg"
+		const w = kg(p.targetWeight);
+		return `${n} × ${p.targetReps}${w ? ` · ${w}kg${ex.loadType === 'per_side' ? ' ×2' : ''}` : ''}`;
+	}
+
+	/**
+	 * The rest a superset will ACTUALLY time. SupersetGroup.restSec is not read by the
+	 * workout store — since supersets started timing rest after EVERY logged set, the
+	 * seed comes from each planned set's targetRestSec (falling back to the exercise's
+	 * own default). Printing the group's decorative 60s next to "after each round" was
+	 * wrong twice over, so show the real numbers and the real cadence instead.
+	 */
+	function groupRest(members: TemplateExercise[]): string {
+		const vals = new Set<number>();
+		for (const m of members) {
+			const ex = byId.get(m.exerciseId);
+			for (const ps of m.plannedSets) {
+				const v = ps.targetRestSec ?? ex?.defaultRestSec;
+				if (v != null) vals.add(v);
+			}
+		}
+		if (!vals.size) return '';
+		const lo = Math.min(...vals);
+		const hi = Math.max(...vals);
+		return lo === hi ? `rest ${mmss(lo)} after each set` : `rest ${mmss(lo)}–${mmss(hi)} after each set`;
 	}
 
 	async function start() {
 		await workout.startFromTemplate(id);
 		goto('/workout');
+	}
+
+	let libraryError = $state('');
+
+	async function del() {
+		if (!tpl) return;
+		if (!confirm(`Delete "${tpl.name}"? Workouts you already logged from it are kept.`)) return;
+		try {
+			await getRepository().deleteTemplate(tpl.id);
+			// replaceState so Back can't land on the detail screen of a template that
+			// no longer exists (it would render as a blank page under the topbar).
+			goto('/', { replaceState: true });
+		} catch (e) {
+			libraryError = e instanceof Error ? e.message : 'Could not delete this template. Try again.';
+		}
+	}
+
+	async function duplicate() {
+		if (!tpl) return;
+		try {
+			const copy = duplicateTemplate($state.snapshot(tpl) as Template);
+			await getRepository().upsertTemplate(copy);
+			// land in the copy's EDITOR, not its detail page — "<name> copy" is a
+			// placeholder the user almost always wants to rename straight away
+			goto(`/template/${copy.id}/edit`);
+		} catch (e) {
+			libraryError = e instanceof Error ? e.message : 'Could not duplicate this template. Try again.';
+		}
 	}
 </script>
 
@@ -84,10 +136,17 @@
 {/snippet}
 
 <div class="screen">
-	<TopBar title="Template" actions={['edit']} onAction={() => goto(`/template/${id}/edit`)} />
+	<TopBar
+		title="Template"
+		actions={['edit', 'trash']}
+		onAction={(a) => (a === 'trash' ? del() : goto(`/template/${id}/edit`))}
+	/>
 	<div class="screen-body">
 		{#if tpl && td}
 			<div class="pad">
+				{#if libraryError}
+					<div class="txt-sm" role="alert" style="color:var(--warn);margin-bottom:10px">{libraryError}</div>
+				{/if}
 				<div class="hero" style="margin-bottom:16px"></div>
 				<h1 class="h-app" style="margin-bottom:14px">{tpl.name}</h1>
 
@@ -107,18 +166,25 @@
 						{#if item.type === 'single'}
 							{@render exRow(item.te)}
 						{:else}
+							{@const rest = groupRest(item.members)}
 							<div class="superset">
 								<span class="superset-tag"><Icon name="link" size={12} color="#fff" sw={2.2} />Superset</span>
 								{#each item.members as m, mi (m.exerciseId + ':' + mi)}
 									<div class="ss-member">{@render exRow(m, true)}</div>
 								{/each}
-								<div class="ss-rest">
-									<Icon name="timer" size={13} color="var(--accent)" />rest {mmss(item.restSec)} after each round
-								</div>
+								{#if rest}
+									<div class="ss-rest">
+										<Icon name="timer" size={13} color="var(--accent)" />{rest}
+									</div>
+								{/if}
 							</div>
 						{/if}
 					{/each}
 				</div>
+
+				<Button variant="bordered" full style="margin-top:14px" onclick={duplicate}>
+					<Icon name="copy" size={17} />Duplicate template
+				</Button>
 				<div class="actionbar-clear"></div>
 			</div>
 		{/if}
