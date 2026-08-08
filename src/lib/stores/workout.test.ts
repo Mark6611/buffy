@@ -3,21 +3,30 @@
 // restarts (WebView purge) — these tests simulate both by jumping the system
 // clock without ticking intervals, exactly what suspension looks like to JS.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Exercise, WorkoutSession } from '$lib/types';
+import type { Exercise, Template, WorkoutSession } from '$lib/types';
 
 const h = vi.hoisted(() => {
 	const upserted: unknown[] = [];
 	const exercises: Exercise[] = [];
+	const template: { value: unknown } = { value: undefined };
+	const lastSession: { value: unknown } = { value: undefined };
+	const upsertError: { value: Error | null } = { value: null };
+	const calls = { cancelRestEndAlert: 0 };
 	const pendingAdjustment: { value: { endTimeMs: number; skipped: boolean } | null } = { value: null };
 	return {
 		upserted,
 		exercises,
+		template,
+		lastSession,
+		upsertError,
+		calls,
 		pendingAdjustment,
 		repo: {
 			listExercises: async () => exercises,
-			lastSessionForExercise: async () => undefined,
-			getTemplate: async () => undefined,
+			lastSessionForExercise: async () => lastSession.value,
+			getTemplate: async () => template.value,
 			upsertSession: async (s: unknown) => {
+				if (upsertError.value) throw upsertError.value;
 				upserted.push(s);
 			}
 		},
@@ -36,7 +45,9 @@ vi.mock('$lib/native', () => ({
 	allowSleep: async () => {},
 	reacquireWakeLock: async () => {},
 	scheduleRestEndAlert: async () => {},
-	cancelRestEndAlert: async () => {},
+	cancelRestEndAlert: async () => {
+		h.calls.cancelRestEndAlert++;
+	},
 	startRestLiveActivity: async () => {},
 	endRestLiveActivity: async () => {},
 	readPendingRestAdjustment: async () => {
@@ -125,6 +136,10 @@ beforeEach(() => {
 	h.exercises.length = 0;
 	h.exercises.push(press);
 	h.upserted.length = 0;
+	h.template.value = undefined;
+	h.lastSession.value = undefined;
+	h.upsertError.value = null;
+	h.calls.cancelRestEndAlert = 0;
 	h.pendingAdjustment.value = null;
 });
 
@@ -184,8 +199,8 @@ describe('rest timer — wall-clock derived', () => {
 		workout.addExercise(press); // 3 prefilled sets
 		workout.toggleSet(0, 0);
 		jumpClock(30);
-		const id = await workout.finish();
-		expect(id).not.toBeNull();
+		const res = await workout.finish();
+		expect(res.status).toBe('saved');
 		const saved = h.upserted[0] as WorkoutSession;
 		expect(saved.exercises).toHaveLength(1);
 		expect(saved.exercises[0].sets).toHaveLength(1); // 2 unchecked sets dropped
@@ -567,5 +582,272 @@ describe('moveExercise', () => {
 		// moving the standalone back up jumps the whole block
 		workout.moveExercise(2, -1);
 		expect(workout.session!.exercises.map((e) => e.exerciseId)).toEqual(['press', 'curl', 'row']);
+	});
+});
+
+const treadmill: Exercise = {
+	id: 'treadmill',
+	name: 'Treadmill',
+	equipment: 'cardio',
+	primaryMuscles: ['Cardio'],
+	secondaryMuscles: [],
+	trackingType: 'cardio',
+	loadType: 'total',
+	cardioMetric: 'distance',
+	defaultRestSec: 0
+};
+
+function templateWith(exerciseIds: string[], over: Partial<Template> = {}): Template {
+	return {
+		id: 'tpl-1',
+		name: 'Test Template',
+		exercises: exerciseIds.map((id) => ({
+			exerciseId: id,
+			groupId: null,
+			plannedSets: [{ targetReps: 10, targetWeight: 20 }]
+		})),
+		groups: [],
+		createdAt: new Date(BASE).toISOString(),
+		updatedAt: new Date(BASE).toISOString(),
+		...over
+	};
+}
+
+describe('starting never overwrites a live workout', () => {
+	it('startAdhoc refuses while a session is in progress', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0); // a real logged set that exists nowhere else yet
+		const id = workout.session?.id;
+
+		const res = await workout.startAdhoc();
+		expect(res).toEqual({ ok: false, reason: 'in-progress' });
+		expect(workout.session?.id).toBe(id);
+		expect(workout.session?.exercises[0].sets[0].completed).toBe(true);
+	});
+
+	it('startFromTemplate refuses while a session is in progress', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0);
+		const id = workout.session?.id;
+		h.template.value = templateWith(['press']);
+
+		const res = await workout.startFromTemplate('tpl-1');
+		expect(res).toEqual({ ok: false, reason: 'in-progress' });
+		expect(workout.session?.id).toBe(id);
+		expect(workout.session?.title).toBe('Quick log'); // not replaced by the template's
+		expect(workout.session?.exercises[0].sets[0].completed).toBe(true);
+	});
+
+	it('the guard lifts once the live workout is cancelled', async () => {
+		await workout.startAdhoc();
+		workout.cancel();
+		const res = await workout.startAdhoc();
+		expect(res.ok).toBe(true);
+		expect(workout.active).toBe(true);
+	});
+});
+
+describe('startFromTemplate', () => {
+	it('skips an exercise the catalog no longer has instead of throwing', async () => {
+		h.template.value = templateWith(['press', 'ghost', 'curl']);
+		h.exercises.push(curl);
+
+		const res = await workout.startFromTemplate('tpl-1');
+		expect(res).toEqual({ ok: true, skippedExerciseIds: ['ghost'] });
+		expect(workout.session?.exercises.map((e) => e.exerciseId)).toEqual(['press', 'curl']);
+		// the three parallel arrays must stay index-aligned or the table renders
+		// one exercise's columns against another's sets
+		expect(workout.meta.map((e) => e.id)).toEqual(['press', 'curl']);
+		expect(workout.plannedRest).toHaveLength(2);
+	});
+
+	it('reports a missing template without starting anything', async () => {
+		h.template.value = undefined;
+		const res = await workout.startFromTemplate('gone');
+		expect(res).toEqual({ ok: false, reason: 'missing-template' });
+		expect(workout.active).toBe(false);
+	});
+
+	it('prefills the cardio distance target so it does not have to be retyped', async () => {
+		h.exercises.push(treadmill);
+		h.template.value = templateWith([], {
+			exercises: [
+				{
+					exerciseId: 'treadmill',
+					groupId: null,
+					plannedSets: [{ targetTimeSec: 600, targetDistanceMeters: 2000 }]
+				}
+			]
+		});
+		await workout.startFromTemplate('tpl-1');
+		expect(workout.session?.exercises[0].sets[0].distanceMeters).toBe(2000);
+		expect(workout.session?.exercises[0].sets[0].timeSec).toBe(600);
+	});
+
+	it('reads the last-time history even with auto-progression off', async () => {
+		// the setting governs the suggested STEP; the history readout is not the feature
+		expect(h.settings.current.autoProgression).toBe(false);
+		h.lastSession.value = {
+			id: 'prev',
+			startedAt: new Date(BASE - 86_400_000).toISOString(),
+			endedAt: new Date(BASE - 86_400_000).toISOString(),
+			sourceTemplateId: null,
+			title: 'prev',
+			exercises: [{ exerciseId: 'press', groupId: null, sets: [{ index: 0, completed: true, reps: 10, weight: 12 }] }]
+		};
+		h.template.value = templateWith(['press']);
+		await workout.startFromTemplate('tpl-1');
+		expect(workout.suggestions['press']?.last).toBe('10×12kg ×2');
+	});
+});
+
+describe('rest seed of zero means no rest', () => {
+	it('logging a cardio set with a 0 seed starts no timer', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(treadmill); // defaultRestSec 0
+		expect(workout.plannedRest[0]).toEqual([0, 0, 0]);
+		workout.toggleSet(0, 0);
+		expect(workout.session?.exercises[0].sets[0].completed).toBe(true); // still logged
+		expect(workout.restRunning).toBe(false);
+		expect(workout.restForSet).toBeNull();
+		expect(workout.restOver).toBe(false); // no phantom "rest overage" banner
+	});
+
+	it('setPlannedRest keeps 0 as "no rest" but floors any real value at 5s', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		workout.setPlannedRest(0, 0, 0); // blanking the cell
+		expect(workout.plannedRest[0][0]).toBe(0);
+		workout.setPlannedRest(0, 1, 3);
+		expect(workout.plannedRest[0][1]).toBe(5);
+		workout.setPlannedRest(0, 2, 75);
+		expect(workout.plannedRest[0][2]).toBe(75);
+	});
+});
+
+describe('finish with nothing ticked', () => {
+	// The autopersist $effect is window-gated and never runs under the node env, so
+	// these seed RESUME_KEY by hand: its survival is the proof that cancel() — which
+	// removes it, along with the session note — was NOT called.
+	it('keeps the workout alive instead of discarding it silently', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		workout.setNote('felt strong');
+		backing.set(RESUME_KEY, 'snapshot');
+		const res = await workout.finish();
+		expect(res).toEqual({ status: 'nothing-logged' });
+		expect(h.upserted).toHaveLength(0); // no empty session written
+		expect(workout.active).toBe(true); // …and nothing destroyed
+		expect(workout.session?.note).toBe('felt strong');
+		expect(backing.has(RESUME_KEY)).toBe(true);
+	});
+
+	it('still drops an empty shell quietly', async () => {
+		await workout.startAdhoc(); // no exercises ever added
+		backing.set(RESUME_KEY, 'snapshot');
+		const res = await workout.finish();
+		expect(res).toEqual({ status: 'empty' });
+		expect(workout.active).toBe(false);
+		expect(backing.has(RESUME_KEY)).toBe(false);
+	});
+
+	it('leaves the workout resumable when the write fails', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0);
+		backing.set(RESUME_KEY, 'snapshot');
+		h.upsertError.value = new Error('QuotaExceededError');
+		await expect(workout.finish()).rejects.toThrow('QuotaExceededError');
+		expect(workout.active).toBe(true);
+		expect(workout.session?.exercises[0].sets[0].completed).toBe(true);
+		expect(backing.has(RESUME_KEY)).toBe(true);
+	});
+});
+
+describe('propagateWeight', () => {
+	it('carries an edited load to the later sets that still agreed with the old one', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets.forEach((s) => (s.weight = 20));
+		sets[0].weight = 25; // the input's oninput already wrote the new value
+		workout.propagateWeight(0, 0, 20);
+		expect(sets.map((s) => s.weight)).toEqual([25, 25, 25]);
+	});
+
+	it('leaves a deliberate pyramid alone', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets[0].weight = 20;
+		sets[1].weight = 30;
+		sets[2].weight = 40;
+		sets[0].weight = 25;
+		workout.propagateWeight(0, 0, 20);
+		expect(sets.map((s) => s.weight)).toEqual([25, 30, 40]);
+	});
+
+	it('never rewrites a set that is already logged, or an earlier one', async () => {
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		const sets = workout.session!.exercises[0].sets;
+		sets.forEach((s) => (s.weight = 20));
+		workout.toggleSet(0, 2); // set 3 is a record now, not a plan
+		sets[1].weight = 25;
+		workout.propagateWeight(0, 1, 20);
+		expect(sets.map((s) => s.weight)).toEqual([20, 25, 20]);
+	});
+});
+
+describe('resume snapshot carries exercise metadata', () => {
+	it('restores the table shape on the first paint, before hydrateMeta lands', async () => {
+		// a snapshot written by the current build, for a CARDIO exercise: without meta
+		// the table paints Rest/Reps/kg bound to the wrong fields until the async
+		// hydrate lands, and the Live Activity says "Rest" instead of the exercise name
+		h.exercises.push(treadmill);
+		const snap = resumeSnapshot();
+		snap.session.exercises[0].exerciseId = 'treadmill';
+		backing.set(RESUME_KEY, JSON.stringify({ ...snap, meta: [treadmill] }));
+		workout.restore();
+		// synchronously — no await: this is the frame the workout screen first paints
+		expect(workout.meta[0]?.trackingType).toBe('cardio');
+		await flush();
+		expect(workout.meta[0]?.id).toBe('treadmill');
+	});
+
+	it('still restores a snapshot written before meta was persisted', async () => {
+		backing.set(RESUME_KEY, JSON.stringify(resumeSnapshot()));
+		workout.restore();
+		expect(workout.active).toBe(true);
+		expect(workout.meta).toEqual([]);
+		await flush();
+		expect(workout.meta[0]?.name).toBe('Dumbbell Shoulder Press');
+	});
+
+	it('cancels the pending OS rest alert on a cold relaunch', () => {
+		backing.set(RESUME_KEY, JSON.stringify(resumeSnapshot()));
+		h.calls.cancelRestEndAlert = 0;
+		workout.restore();
+		// a cold relaunch never fires visibilitychange, so restore() owns the cancel
+		expect(h.calls.cancelRestEndAlert).toBeGreaterThan(0);
+	});
+});
+
+describe('addExercise', () => {
+	it('reads the added exercise history so the "last time" anchor appears', async () => {
+		h.lastSession.value = {
+			id: 'prev',
+			startedAt: new Date(BASE - 86_400_000).toISOString(),
+			endedAt: new Date(BASE - 86_400_000).toISOString(),
+			sourceTemplateId: null,
+			title: 'prev',
+			exercises: [{ exerciseId: 'press', groupId: null, sets: [{ index: 0, completed: true, reps: 10, weight: 12 }] }]
+		};
+		await workout.startAdhoc();
+		workout.addExercise(press);
+		await flush();
+		expect(workout.suggestions['press']?.last).toBe('10×12kg ×2');
 	});
 });

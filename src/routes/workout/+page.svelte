@@ -14,7 +14,7 @@
 	import { writeHealthWorkout } from '$lib/native';
 	import { runCloudSync } from '$lib/cloudSync';
 	import { applyFullSync, applyWeightsOnlySync, buildTemplateFromSession } from '$lib/templateSync';
-	import type { LoggedSet, Template, WorkoutSession } from '$lib/types';
+	import type { LoggedExercise, LoggedSet, Template, WorkoutSession } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import { haptic } from '$lib/native';
 	import Thumb from '$lib/components/Thumb.svelte';
@@ -32,22 +32,95 @@
 
 	// After finishing, offer to sync the result back into its source template (or,
 	// for a quick-log session, offer to save it as a brand-new one) before leaving.
-	let syncPrompt = $state<{ savedId: string; session: WorkoutSession; template: Template | null } | null>(null);
+	let syncPrompt = $state<{
+		savedId: string;
+		session: WorkoutSession;
+		template: Template | null;
+		diff: TemplateDiff | null;
+	} | null>(null);
 	let newTemplateName = $state('');
 	let syncBusy = $state(false);
 	let syncError = $state('');
+	let finishError = $state('');
 	let finishing = $state(false);
+
+	// What "Update whole template" would actually do to the template, counted against
+	// what was logged. Pairs by occurrence order for the same reason applyWeightsOnlySync
+	// does — the same exercise can legitimately appear twice in one session.
+	type TemplateDiff = { droppedExercises: number; droppedSets: number; changed: boolean };
+	function templateDiff(tpl: Template, s: WorkoutSession): TemplateDiff {
+		const queues = new Map<string, LoggedExercise[]>();
+		for (const le of s.exercises) {
+			const q = queues.get(le.exerciseId);
+			if (q) q.push(le);
+			else queues.set(le.exerciseId, [le]);
+		}
+		let droppedExercises = 0;
+		let droppedSets = 0;
+		let changed = false;
+		for (const tex of tpl.exercises) {
+			const le = queues.get(tex.exerciseId)?.shift();
+			if (!le) {
+				droppedExercises++;
+				droppedSets += tex.plannedSets.length;
+				changed = true;
+				continue;
+			}
+			if (le.sets.length !== tex.plannedSets.length) {
+				droppedSets += Math.max(0, tex.plannedSets.length - le.sets.length);
+				changed = true;
+			}
+			tex.plannedSets.forEach((ps, i) => {
+				const set = le.sets[i];
+				if (!set) return;
+				if (
+					(set.reps ?? ps.targetReps) !== ps.targetReps ||
+					(set.weight ?? ps.targetWeight) !== ps.targetWeight ||
+					(set.durationSec ?? ps.targetDurationSec) !== ps.targetDurationSec ||
+					(set.timeSec ?? ps.targetTimeSec) !== ps.targetTimeSec ||
+					(set.incline ?? ps.targetIncline) !== ps.targetIncline ||
+					(set.speed ?? ps.targetSpeed) !== ps.targetSpeed ||
+					(set.distanceMeters ?? ps.targetDistanceMeters) !== ps.targetDistanceMeters
+				)
+					changed = true;
+			});
+		}
+		// anything logged that the template doesn't have (added mid-workout) is a change too
+		for (const q of queues.values()) if (q.length) changed = true;
+		return { droppedExercises, droppedSets, changed };
+	}
+	const fullSyncCost = $derived.by(() => {
+		const d = syncPrompt?.diff;
+		if (!d || (!d.droppedExercises && !d.droppedSets)) return '';
+		const ex = d.droppedExercises === 1 ? '1 exercise' : `${d.droppedExercises} exercises`;
+		const sets = d.droppedSets === 1 ? '1 set' : `${d.droppedSets} sets`;
+		return d.droppedExercises
+			? `Removes ${ex} (${sets}) you skipped today.`
+			: `Removes ${sets} you skipped today.`;
+	});
 
 	async function finish() {
 		if (finishing) return; // double-tap would double-write Health + race two syncs
 		finishing = true;
+		finishError = '';
 		try {
 			const wasTemplateSourced = workout.session?.sourceTemplateId ?? null;
-			const id = await workout.finish();
-			if (!id) {
+			const res = await workout.finish();
+			if (res.status === 'empty') {
 				goto('/');
 				return;
 			}
+			if (res.status === 'nothing-logged') {
+				// The store deliberately kept the workout alive here: discarding it also
+				// takes the session note and the resume snapshot, and Finish used to do
+				// that with no message at all.
+				if (confirm('No sets are marked complete, so nothing will be saved. Discard this workout?')) {
+					workout.cancel();
+					goto('/');
+				}
+				return;
+			}
+			const id = res.id;
 			void autoBackup(); // native: snapshot all data to Documents after a logged workout
 			void refreshWidget();
 			if (!settings.loaded) await settings.load(); // e.g. quick-log never loads settings itself
@@ -82,11 +155,28 @@
 					goto(`/history/${id}`); // source template was deleted mid-workout — nothing to sync
 					return;
 				}
-				syncPrompt = { savedId: id, session: saved, template: tpl };
+				const diff = templateDiff(tpl, saved);
+				if (!diff.changed) {
+					// You did exactly what the template says — there is nothing to offer,
+					// and asking anyway is what turned this sheet into a nag.
+					triggerCloudSync();
+					goto(`/history/${id}`);
+					return;
+				}
+				syncPrompt = { savedId: id, session: saved, template: tpl, diff };
 			} else {
 				newTemplateName = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-				syncPrompt = { savedId: id, session: saved, template: null };
+				syncPrompt = { savedId: id, session: saved, template: null, diff: null };
 			}
+		} catch (e) {
+			// The store builds the finished record on a snapshot and only clears the live
+			// session AFTER the write resolves, so a failure here (storage full / WebKit
+			// eviction) has cost the user nothing — say so, because the only other signal
+			// is the Finish button quietly re-enabling.
+			finishError =
+				e instanceof Error && e.message
+					? `Couldn't save this workout: ${e.message}. Nothing was lost — try Finish again.`
+					: "Couldn't save this workout. Nothing was lost — try Finish again.";
 		} finally {
 			finishing = false;
 		}
@@ -159,11 +249,28 @@
 	function autofocusNode(n: HTMLElement) {
 		n.focus();
 	}
-	function close() {
+	// The chevron MINIMIZES: the workout keeps running (the store is a singleton and
+	// its resume snapshot stays current), and home shows a resume bar to get back in.
+	// Discarding is a separate, explicit action at the bottom of the screen — it used
+	// to be what this button did, which is why the glyph promised something else.
+	function minimize() {
+		goto('/');
+	}
+	function discardWorkout() {
 		if (confirm('Discard this workout? Nothing will be saved.')) {
 			workout.cancel();
 			goto('/');
 		}
+	}
+	// Removing the last set is normally the intended one-tap "abandon this set", so it
+	// stays unconfirmed — but once that set is LOGGED it's real data with no undo, and
+	// the exercise-level delete right next to it has confirmed all along.
+	function removeLastSet(exIndex: number) {
+		const le = workout.session?.exercises[exIndex];
+		const last = le?.sets.at(-1);
+		const name = workout.meta[exIndex]?.name ?? 'this exercise';
+		if (last?.completed && !confirm(`Delete the logged set ${le!.sets.length} of ${name}?`)) return;
+		workout.removeSet(exIndex);
 	}
 	function removeExercise(exIndex: number) {
 		const le = workout.session?.exercises[exIndex];
@@ -238,8 +345,13 @@
 		const el = e.currentTarget as HTMLElement;
 		if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
 		if (setDragStart?.intent && setDrag.x < SET_DELETE_AT) {
-			void haptic('light');
-			workout.removeSetAt(setDrag.ex, setDrag.set);
+			const { ex, set } = setDrag;
+			// same rule as the Remove button: a logged set is data, not a plan
+			const target = workout.session?.exercises[ex]?.sets[set];
+			if (!target?.completed || confirm(`Delete logged set ${set + 1}?`)) {
+				void haptic('light');
+				workout.removeSetAt(ex, set);
+			}
 		}
 		setDrag = null;
 		setDragStart = null;
@@ -250,6 +362,20 @@
 		setDrag = null;
 		setDragStart = null;
 	}
+	// Tapping a weight to change it shouldn't mean backspacing the old number first.
+	// select() is spec'd only for text-ish inputs, so on engines that no-op it for
+	// type="number" this is simply inert — never a hard dependency.
+	function selectOnFocus(e: FocusEvent & { currentTarget: HTMLInputElement }) {
+		try {
+			e.currentTarget.select();
+		} catch {
+			/* not a selectable input type in this engine */
+		}
+	}
+	// What a weight cell held when it was focused — propagateWeight needs it to tell
+	// "this exercise is all at one load" from a deliberate pyramid or drop set.
+	let weightBefore: number | undefined;
+
 	function setRowStyle(ex: number, set: number): string {
 		const d = setDrag && setDrag.ex === ex && setDrag.set === set ? setDrag : null;
 		const x = d?.x ?? 0;
@@ -263,24 +389,34 @@
 
 {#snippet restCell(exIndex: number, s: number, set: LoggedSet)}
 	<td class={set.completed ? '' : 'muted'}>
-		{#if set.completed}{set.restTakenSec != null ? mmss(set.restTakenSec) : '—'}{:else if s === 0}—{:else}<input class="inp rest-inp" type="text" aria-label="Set {s + 1} planned rest" value={mmss(workout.plannedRest[exIndex]?.[s] ?? 0)} onchange={(e) => workout.setPlannedRest(exIndex, s, parseMmss(e.currentTarget.value))} />{/if}
+		<!-- every pending set gets its own seed input, set 1 included: its rest is the
+		     one the timer uses most, and toggleSet reads plannedRest[ex][0] for it -->
+		{#if set.completed}{set.restTakenSec != null ? mmss(set.restTakenSec) : '—'}{:else}<input class="inp rest-inp" type="text" aria-label="Set {s + 1} planned rest" value={mmss(workout.plannedRest[exIndex]?.[s] ?? 0)} onchange={(e) => workout.setPlannedRest(exIndex, s, parseMmss(e.currentTarget.value))} />{/if}
 	</td>
 {/snippet}
 
 {#if workout.session}
 	<div class="screen">
 		<div class="topbar" style="padding-bottom:6px">
-			<button class="icon-btn" onclick={close} aria-label="Close"><Icon name="chevD" size={20} /></button>
+			<button class="icon-btn" onclick={minimize} aria-label="Minimize workout — it keeps running" title="Minimize — the workout keeps running">
+				<Icon name="chevD" size={20} />
+			</button>
 			<div style="text-align:center">
 				<div style="font-size:calc(var(--dt-base)*15/17);font-weight:600;letter-spacing:-0.2px">{workout.session.title}</div>
 				<div class="mono txt-sm" style="margin-top:1px">
 					{mmss(workout.elapsedSec)} · {workout.exerciseCount
 						? `${workout.activeEx + 1}/${workout.exerciseCount}`
 						: 'no exercises'}
+					<!-- the rest banner lives inside one exercise block and scrolls away with
+					     it; the topbar is outside the scroller, so the countdown stays reachable -->
+					{#if workout.restForSet}<span style="color:{workout.restOver ? 'var(--warn)' : 'var(--accent-ink)'};font-weight:600"> · {mmss(workout.restRemaining)}</span>{/if}
 				</div>
 			</div>
 			<Button size="regular" onclick={finish} disabled={finishing}>Finish</Button>
 		</div>
+		{#if finishError}
+			<div class="txt-sm" style="padding:0 16px 8px;color:var(--warn)">{finishError}</div>
+		{/if}
 
 		<div class="screen-body">
 			<div class="pad" style="padding-bottom:40px">
@@ -386,9 +522,11 @@
 											<td><input class="inp" type="text" aria-label="Set {s + 1} hold time" value={mmss(set.durationSec ?? 0)} onchange={(e) => (set.durationSec = parseMmss(e.currentTarget.value))} /></td>
 										{:else}
 											{@render restCell(exIndex, s, set)}
-											<td><input class="inp" type="number" aria-label="Set {s + 1} reps" value={set.reps ?? ''} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} /></td>
+											<td><input class="inp" type="number" aria-label="Set {s + 1} reps" value={set.reps ?? ''} onfocus={selectOnFocus} oninput={(e) => (set.reps = numOrUndef(e.currentTarget.value))} /></td>
 											{#if !bw}
-												<td><input class="inp" type="number" step="0.5" aria-label="Set {s + 1} weight in kilograms" value={set.weight ?? ''} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} /></td>
+												<!-- on commit, the new load carries down to the later sets that still
+												     agreed with the old one (see workout.propagateWeight) -->
+												<td><input class="inp" type="number" step="0.5" aria-label="Set {s + 1} weight in kilograms" value={set.weight ?? ''} onfocus={(e) => { weightBefore = set.weight; selectOnFocus(e); }} oninput={(e) => (set.weight = numOrUndef(e.currentTarget.value))} onchange={() => workout.propagateWeight(exIndex, s, weightBefore)} /></td>
 											{/if}
 											{#if settings.current.trackRpe}
 												<td><input class="inp" type="number" step="0.5" min="6" max="10" inputmode="decimal" aria-label="Set {s + 1} RPE" value={set.rpe ?? ''} oninput={(e) => (set.rpe = numOrUndef(e.currentTarget.value))} /></td>
@@ -412,7 +550,7 @@
 							<button
 								class="txt-sm tap-row"
 								style="display:flex;align-items:center;gap:6px;padding:9px 2px 0;color:var(--ink-2);background:none;border:none"
-								onclick={() => workout.removeSet(exIndex)}
+								onclick={() => removeLastSet(exIndex)}
 								disabled={le.sets.length <= 1}
 								aria-label="Remove last set from {ex?.name}"
 							>
@@ -420,7 +558,9 @@
 							</button>
 						</div>
 
-						{#if ex?.equipment === 'barbell' && exIndex === workout.activeEx && (le.sets[workout.activeSet]?.weight ?? 0) > 0}
+						<!-- platesPerSide's input is the BAR TOTAL. A per-side exercise logs one
+						     side, so there is no total to break down — suppress rather than invent one. -->
+						{#if ex?.equipment === 'barbell' && !perSide && exIndex === workout.activeEx && (le.sets[workout.activeSet]?.weight ?? 0) > 0}
 							<div class="txt-sm" style="display:flex;align-items:center;gap:8px;padding:9px 2px 0;color:var(--ink-2)">
 								<span style="font-size:calc(var(--dt-base)*10.5/17);font-weight:600;letter-spacing:0.4px;color:var(--ink-3);border:1px solid var(--line);border-radius:5px;padding:1px 5px">BAR</span>
 								<span class="mono">{formatPerSide(platesPerSide(le.sets[workout.activeSet]?.weight ?? 0))}</span>
@@ -432,9 +572,13 @@
 							<div style="display:flex;align-items:center;gap:8px;padding:10px 2px 2px;flex-wrap:wrap">
 								<Icon name="spark" size={14} color="var(--accent)" />
 								<span class="txt-sm" style="color:var(--ink-2)">Last {sg.last} · {sg.hit ? 'hit target →' : 'aim again'}</span>
-								<span class="suggest">
-									{sg.stepLabel}{#if sg.nextWeight != null} · {kg(sg.nextWeight)}kg{:else if sg.nextReps != null} · {sg.nextReps} reps{/if}
-								</span>
+								<!-- "Last …" is history and always shown; only the suggested STEP is the
+								     auto-progression feature the Settings toggle governs -->
+								{#if settings.current.autoProgression}
+									<span class="suggest">
+										{sg.stepLabel}{#if sg.nextWeight != null} · {kg(sg.nextWeight)}kg{:else if sg.nextReps != null} · {sg.nextReps} reps{/if}
+									</span>
+								{/if}
 							</div>
 						{/if}
 
@@ -456,6 +600,13 @@
 						oninput={(e) => workout.setNote(e.currentTarget.value)}
 					></textarea>
 				</div>
+
+				<!-- Discarding used to be what the topbar chevron did. Now that the chevron
+				     minimizes, throwing the workout away needs its own named control — kept
+				     at the bottom, out of the logging path, and still confirm-gated. -->
+				<div style="margin-top:24px;display:flex;justify-content:center">
+					<Button variant="destructive" size="regular" onclick={discardWorkout}>Discard workout</Button>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -470,13 +621,20 @@
 		{#if syncPrompt.template}
 			<div class="h-card" id="sheet-title" style="font-size:calc(var(--dt-base)*19/17);margin-bottom:6px">Update “{syncPrompt.template.name}”?</div>
 			<div class="txt" style="margin-bottom:16px">You made changes this workout — apply them back to the template for next time?</div>
+			<!-- Weights-only is the FILLED (default) action: it only touches numbers on
+			     sets the template already has. The whole-template option rewrites the
+			     exercise list to exactly what was logged — destructive, undoable only by
+			     rebuilding the template by hand — so it is bordered and states its cost. -->
 			<div style="display:flex;flex-direction:column;gap:9px">
-				<Button onclick={() => chooseTemplateSync('full')} disabled={syncBusy}>
-					Update whole template
-				</Button>
-				<Button variant="bordered" onclick={() => chooseTemplateSync('weightsOnly')} disabled={syncBusy}>
+				<Button onclick={() => chooseTemplateSync('weightsOnly')} disabled={syncBusy}>
 					Update weights only
 				</Button>
+				<Button variant="bordered" onclick={() => chooseTemplateSync('full')} disabled={syncBusy}>
+					Replace template with this workout
+				</Button>
+				{#if fullSyncCost}
+					<div class="txt-sm" style="margin:-4px 4px 2px;color:var(--ink-3);text-align:center">{fullSyncCost}</div>
+				{/if}
 				<!-- the dismissive third option is the kit's Default (plain) style, not a
 				     third outlined pill fighting the two above for weight -->
 				<Button variant="plain" onclick={() => chooseTemplateSync('none')} disabled={syncBusy}>

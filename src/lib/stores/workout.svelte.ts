@@ -30,6 +30,12 @@ const RESUME_KEY = 'buffy:activeWorkout';
 interface ResumeSnapshot {
 	session: WorkoutSession;
 	plannedRest: number[][];
+	/** Exercise metadata parallel to session.exercises. Snapshotted (rather than
+	 *  re-read on resume) so the table renders with the RIGHT columns on the first
+	 *  paint, and so the Live Activity keeps the exercise name instead of falling
+	 *  back to a generic "Rest". Optional — snapshots written by older builds
+	 *  don't carry it and still restore. */
+	meta?: Exercise[];
 	activeEx: number;
 	activeSet: number;
 	restRunning: boolean;
@@ -38,6 +44,16 @@ interface ResumeSnapshot {
 	restStartedAtMs: number;
 	restAccumSec: number;
 }
+
+/** Outcome of a start attempt. A live workout is never overwritten — the caller
+ *  decides what to offer (resume it, or cancel() then start again). */
+export type StartResult =
+	| { ok: true; skippedExerciseIds: string[] }
+	| { ok: false; reason: 'in-progress' | 'missing-template' };
+
+/** Outcome of finish(). `nothing-logged` does NOT discard: cancel() wipes the
+ *  resume snapshot and the session note, so the caller has to confirm first. */
+export type FinishResult = { status: 'saved'; id: string } | { status: 'nothing-logged' } | { status: 'empty' };
 
 class WorkoutStore {
 	session = $state<WorkoutSession | null>(null);
@@ -92,6 +108,7 @@ class WorkoutStore {
 					const snap: ResumeSnapshot = {
 						session: $state.snapshot(this.session) as WorkoutSession,
 						plannedRest: $state.snapshot(this.plannedRest) as number[][],
+						meta: $state.snapshot(this.meta) as Exercise[],
 						activeEx: this.activeEx,
 						activeSet: this.activeSet,
 						restRunning: this.restRunning,
@@ -153,22 +170,35 @@ class WorkoutStore {
 		this.interval = null;
 	}
 
-	async startFromTemplate(templateId: string, applySuggestions = false) {
+	async startFromTemplate(templateId: string, applySuggestions = false): Promise<StartResult> {
+		// Never overwrite a live workout — same guard restore() has always had. The
+		// caller decides what to offer instead (resume, or cancel() then start).
+		if (this.session) return { ok: false, reason: 'in-progress' };
 		const repo = getRepository();
 		await settings.load();
 		const [tpl, exAll] = await Promise.all([repo.getTemplate(templateId), repo.listExercises()]);
-		if (!tpl) return;
+		if (!tpl) return { ok: false, reason: 'missing-template' };
 		const byId = new Map(exAll.map((e) => [e.id, e]));
 
 		const meta: Exercise[] = [];
 		const plannedRest: number[][] = [];
-		const exercises: LoggedExercise[] = tpl.exercises.map((tex) => {
-			const ex = byId.get(tex.exerciseId)!;
+		const exercises: LoggedExercise[] = [];
+		// A template can outlive an exercise it references (an interrupted sync pushes
+		// templates and exercises independently). Skip the orphan rather than asserting
+		// on it — every other consumer optional-chains, and a throw here reached the
+		// user as a Start button that silently did nothing.
+		const skippedExerciseIds: string[] = [];
+		for (const tex of tpl.exercises) {
+			const ex = byId.get(tex.exerciseId);
+			if (!ex) {
+				skippedExerciseIds.push(tex.exerciseId);
+				continue;
+			}
 			meta.push(ex);
 			plannedRest.push(
 				tex.plannedSets.map((ps) => ps.targetRestSec ?? ex.defaultRestSec ?? settings.current.defaultRestSec)
 			);
-			return {
+			exercises.push({
 				exerciseId: tex.exerciseId,
 				groupId: tex.groupId ?? null,
 				setupNote: tex.setupNote ?? ex.setupNote,
@@ -181,22 +211,23 @@ class WorkoutStore {
 					timeSec: ps.targetTimeSec,
 					incline: ps.targetIncline,
 					speed: ps.targetSpeed,
+					distanceMeters: ps.targetDistanceMeters,
 					perSide: ex.loadType === 'per_side' ? true : undefined
 				}))
-			};
-		});
-
-		// auto-progression suggestions from last time
-		const sugg: Record<string, Suggestion | null> = {};
-		if (settings.current.autoProgression) {
-			await recovery.refresh(); // suggestions must see today's band, not last view's
-			for (const ex of meta) {
-				const last = await repo.lastSessionForExercise(ex.id);
-				sugg[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
-			}
+			});
 		}
 
-		if (applySuggestions) {
+		// "Last time" history and the suggested next step come from the same object,
+		// but only the STEP is the auto-progression feature — read history either way
+		// so turning the setting off doesn't also blank the last-session readout.
+		const sugg: Record<string, Suggestion | null> = {};
+		if (settings.current.autoProgression) await recovery.refresh(); // suggestions must see today's band, not last view's
+		for (const ex of meta) {
+			const last = await repo.lastSessionForExercise(ex.id);
+			sugg[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
+		}
+
+		if (applySuggestions && settings.current.autoProgression) {
 			exercises.forEach((le) => {
 				const sg = sugg[le.exerciseId];
 				if (!sg) return;
@@ -223,9 +254,11 @@ class WorkoutStore {
 		this.nowMs = Date.now();
 		this.ensureInterval();
 		keepAwake();
+		return { ok: true, skippedExerciseIds };
 	}
 
-	startAdhoc() {
+	async startAdhoc(): Promise<StartResult> {
+		if (this.session) return { ok: false, reason: 'in-progress' };
 		this.meta = [];
 		this.plannedRest = [];
 		this.suggestions = {};
@@ -240,6 +273,18 @@ class WorkoutStore {
 		this.nowMs = Date.now();
 		this.ensureInterval();
 		keepAwake();
+		// A quick log has no template read to hide a settings load behind, so it happens
+		// here — otherwise the workout screen paints against DEFAULT_SETTINGS (no RPE
+		// column, stock default rest) until something else loads them. Deliberately
+		// AFTER the session exists, so the workout is live the moment this is called
+		// and only the navigation waits on the read — and a failed read must not strand
+		// the caller on its loading screen, since the defaults are perfectly usable.
+		try {
+			await settings.load();
+		} catch {
+			/* keep DEFAULT_SETTINGS — the workout is already live */
+		}
+		return { ok: true, skippedExerciseIds: [] };
 	}
 
 	/** Resume an in-progress workout after an app restart / WebView purge. */
@@ -255,6 +300,7 @@ class WorkoutStore {
 		if (!snap?.session?.exercises?.length) return;
 
 		this.plannedRest = snap.plannedRest ?? [];
+		this.meta = snap.meta ?? []; // pre-meta snapshots restore empty; hydrateMeta fills them in
 		this.activeEx = snap.activeEx ?? 0;
 		this.activeSet = snap.activeSet ?? 0;
 		this.restSeedSec = snap.restSeedSec ?? 0;
@@ -277,9 +323,13 @@ class WorkoutStore {
 
 		this.ensureInterval();
 		keepAwake();
-		// A cold relaunch never fires visibilitychange (nothing transitioned FROM
-		// hidden in this process), so a pending Live Activity adjustment has to be
-		// reconciled here too, before the Activity is re-synced to our state.
+		// A cold relaunch never fires visibilitychange either (nothing transitioned FROM
+		// hidden in this process), so the two things that handler does on the way back in
+		// have to happen here too: drop the OS "rest complete" notification, because the
+		// in-app banner + haptic own the cue while we're in the foreground…
+		cancelRestEndAlert();
+		// …and reconcile a pending Live Activity adjustment BEFORE the Activity is
+		// re-synced to our state.
 		void this.reconcileLiveActivityAdjustment().then(() => this.restLiveSync());
 		void this.hydrateMeta();
 	}
@@ -292,18 +342,22 @@ class WorkoutStore {
 		await settings.load();
 		const exAll = await repo.listExercises();
 		const byId = new Map(exAll.map((e) => [e.id, e]));
-		this.meta = s.exercises.map((le) => byId.get(le.exerciseId) as Exercise);
+		// Keep whatever the resume snapshot already gave us for an exercise the catalog
+		// no longer has (tombstoned mid-workout): a hole here means permanently wrong
+		// columns and a blank name for the rest of the session.
+		this.meta = s.exercises.map((le, i) => byId.get(le.exerciseId) ?? this.meta[i]);
 		const sugg: Record<string, Suggestion | null> = {};
-		if (settings.current.autoProgression) {
-			await recovery.refresh(); // suggestions must see today's band, not last view's
-			for (const le of s.exercises) {
-				const ex = byId.get(le.exerciseId);
-				if (!ex) continue;
-				const last = await repo.lastSessionForExercise(ex.id);
-				sugg[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
-			}
+		if (settings.current.autoProgression) await recovery.refresh(); // suggestions must see today's band, not last view's
+		for (const le of s.exercises) {
+			const ex = byId.get(le.exerciseId);
+			if (!ex) continue;
+			const last = await repo.lastSessionForExercise(ex.id);
+			sugg[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
 		}
 		this.suggestions = sugg;
+		// meta may have arrived after restore()'s restLiveSync ran against an empty
+		// array — re-sync so the Lock Screen / Island shows the exercise name, not "Rest".
+		this.restLiveSync();
 	}
 
 	addExercise(ex: Exercise, sets = 3) {
@@ -321,6 +375,10 @@ class WorkoutStore {
 				perSide: ex.loadType === 'per_side' ? true : undefined
 			}))
 		});
+		// Same one-liner swapExercise ends with: an exercise added mid-session has a
+		// history too, and without this a quick log shows no "last time" anchor at all
+		// (until an app relaunch, where hydrateMeta populates it — an odd inconsistency).
+		void this.hydrateSuggestionFor(ex);
 	}
 
 	/** Remove an exercise entirely from the in-progress workout (any logged sets on it are lost). */
@@ -395,9 +453,10 @@ class WorkoutStore {
 		void this.hydrateSuggestionFor(newEx);
 	}
 
-	/** Fetch (or clear) the auto-progression suggestion for one exercise — used after a swap. */
+	/** Fetch the last-time readout + suggestion for one exercise — used after a swap
+	 *  or an add. Not gated on autoProgression: the setting governs the suggested
+	 *  STEP, which the screen hides on its own; the history readout is always wanted. */
 	private async hydrateSuggestionFor(ex: Exercise) {
-		if (!settings.current.autoProgression) return;
 		const last = await getRepository().lastSessionForExercise(ex.id);
 		this.suggestions[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
 	}
@@ -522,7 +581,25 @@ class WorkoutStore {
 		// (straight sets on one member) silently never started a rest at all. When
 		// you do fly straight to the partner exercise, this rest simply gets folded
 		// into that set as a few seconds of recorded rest — harmless.
-		this.restSeedSec = this.plannedRest[exIndex]?.[setIndex] ?? settings.current.defaultRestSec;
+		const seed = this.plannedRest[exIndex]?.[setIndex] ?? settings.current.defaultRestSec;
+		if (seed <= 0) {
+			// A seed of 0 means "no rest for this set" — the seeded cardio machines ship
+			// that way, and blanking a Rest cell produces it too. Arming the timer anyway
+			// put a red "rest overage" banner and a heavy haptic on screen one second
+			// after every treadmill set, so treat it as no rest at all.
+			cancelRestEndAlert();
+			this.restRunning = false;
+			this.restAccumSec = 0;
+			this.restStartedAtMs = 0;
+			this.restSeedSec = 0;
+			this.restForSet = null;
+			this.restHapticFired = false;
+			this.nowMs = Date.now();
+			this.setActiveToFirstIncomplete();
+			this.restLiveSync();
+			return;
+		}
+		this.restSeedSec = seed;
 		this.restForSet = { ex: exIndex, set: setIndex };
 		this.restStartedAtMs = Date.now();
 		this.restAccumSec = 0;
@@ -531,6 +608,21 @@ class WorkoutStore {
 		this.nowMs = Date.now();
 		this.setActiveToFirstIncomplete();
 		this.restLiveSync();
+	}
+
+	/** Carry an edited weight down to the LATER planned sets of the same exercise that
+	 *  still hold the value it replaced. `previous` is what the cell held before the
+	 *  edit (captured on focus), which is what keeps a deliberate pyramid or drop set
+	 *  intact — only sets that agreed with the old number follow the new one. */
+	propagateWeight(exIndex: number, setIndex: number, previous: number | undefined) {
+		const le = this.session?.exercises[exIndex];
+		const edited = le?.sets[setIndex];
+		if (!le || !edited || edited.weight == null || edited.weight === previous) return;
+		for (let i = setIndex + 1; i < le.sets.length; i++) {
+			const s = le.sets[i];
+			if (s.completed) continue; // already logged — its number is a record, not a plan
+			if (s.weight === previous) s.weight = edited.weight;
+		}
 	}
 
 	adjustRest(delta: number) {
@@ -544,10 +636,15 @@ class WorkoutStore {
 		if (this.restElapsedSec < this.restSeedSec) this.restHapticFired = false;
 		this.restLiveSync();
 	}
-	/** Change the planned rest (timer seed) for an upcoming set. */
+	/** Change the planned rest (timer seed) for an upcoming set. 0 is kept as an
+	 *  explicit "no rest" (blank the cell to get it; toggleSet then starts no timer);
+	 *  anything else floors at 5s like adjustRest, so a 1-second countdown can't be
+	 *  typed in by accident. */
 	setPlannedRest(exIndex: number, setIndex: number, sec: number) {
 		const row = this.plannedRest[exIndex];
-		if (row && setIndex < row.length) row[setIndex] = Math.max(0, Math.round(sec || 0));
+		if (!row || setIndex >= row.length) return;
+		const v = Math.round(sec || 0);
+		row[setIndex] = v > 0 ? Math.max(5, v) : 0;
 	}
 	/** Free-text note for the whole session. */
 	setNote(text: string) {
@@ -675,14 +772,17 @@ class WorkoutStore {
 		}
 	}
 
-	async finish(): Promise<string | null> {
+	async finish(): Promise<FinishResult> {
 		const s = this.session;
-		if (!s) return null;
+		if (!s) return { status: 'empty' };
 		// Build the finished record on a SNAPSHOT — never mutate the live $state session
 		// before the await. If upsert throws (storage full / WebKit eviction), the
 		// in-progress workout and its localStorage resume snapshot must stay intact and
 		// resumable rather than being left pruned and misaligned with meta/plannedRest.
 		const out = $state.snapshot(s) as WorkoutSession;
+		// read before the prune below: what we need to know is whether there was ever
+		// anything in this workout, not what survived the completed-only filter
+		const hadExercises = s.exercises.length > 0;
 		// fold the final running rest into its set
 		if (this.restForSet) {
 			const prev = out.exercises[this.restForSet.ex]?.sets[this.restForSet.set];
@@ -694,13 +794,21 @@ class WorkoutStore {
 			.map((e) => ({ ...e, sets: e.sets.filter((x) => x.completed) }))
 			.filter((e) => e.sets.length > 0);
 		if (out.exercises.length === 0) {
-			this.cancel();
-			return null; // nothing logged — don't save an empty session
+			// Nothing logged — don't save an empty session. But don't discard one either:
+			// cancel() also wipes the session note and the resume snapshot, and Finish
+			// used to do that silently. An empty shell (a quick log nothing was ever
+			// added to) has nothing to lose, so it still goes quietly; anything with
+			// exercises in it comes back for the caller to confirm.
+			if (!hadExercises) {
+				this.cancel();
+				return { status: 'empty' };
+			}
+			return { status: 'nothing-logged' };
 		}
 		await getRepository().upsertSession(out);
 		const id = out.id;
 		this.cancel();
-		return id;
+		return { status: 'saved', id };
 	}
 
 	cancel() {
