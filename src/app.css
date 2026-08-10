@@ -134,9 +134,17 @@ body {
   /* Kill WKWebView's double-tap-to-zoom. Mid-set you tap the same numeric cell
      twice in quick succession all the time, and the WebView reads that as a zoom
      gesture — the screen lurches and you lose your place. `manipulation` disables
-     double-tap zoom (and the legacy 300ms click delay) while LEAVING PINCH-ZOOM
-     intact, so this is not the accessibility regression that user-scalable=no
-     would be. A native app has no such gesture to suppress — see native-pilot/. */
+     double-tap zoom and the legacy 300ms click delay.
+
+     As a CSS property `manipulation` also preserves pinch-zoom — but in THIS app
+     that is moot, and the comment used to claim it as an accessibility win it is
+     not. Capacitor defaults `zoomingEnabled` to NO (CAPInstanceDescriptor.m) and
+     disables `scrollView.pinchGestureRecognizer` outright (WebViewDelegationHandler
+     .swift), so pinch-zoom is already off app-wide and this rule neither helps nor
+     hurts that. Turning it back on is a real WCAG 1.4.4 question, but it is a
+     capacitor.config change, not this one.
+
+     A native app has no double-tap-zoom gesture to suppress — see native-pilot/. */
   touch-action: manipulation;
 }
 @media (min-width: 480px) {
