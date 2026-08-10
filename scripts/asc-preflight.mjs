@@ -50,6 +50,34 @@ const REVIEW_SLOT = new Set([
 	'PROCESSING_FOR_APP_STORE'
 ]);
 
+// A version in any of these states has been APPROVED by Apple at some point. The 90062
+// ceiling is the highest of THESE, not just the currently-live one — a version pulled
+// from sale, or superseded, still counts as previously approved.
+const APPROVED_STATES = new Set([
+	'READY_FOR_SALE',
+	'PENDING_DEVELOPER_RELEASE',
+	'PENDING_APPLE_RELEASE',
+	'PROCESSING_FOR_APP_STORE',
+	'REPLACED_WITH_NEW_VERSION',
+	'DEVELOPER_REMOVED_FROM_SALE',
+	'REMOVED_FROM_SALE'
+]);
+
+/// Component-wise numeric compare, because a string compare puts 1.10 BELOW 1.9.
+const cmpVersion = (a, b) => {
+	const parts = (v) =>
+		String(v)
+			.split('.')
+			.map((n) => (Number.isFinite(Number(n)) ? Number(n) : 0));
+	const pa = parts(a);
+	const pb = parts(b);
+	for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+		const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+		if (d) return d;
+	}
+	return 0;
+};
+
 const uploadBlockers = []; // exit 1 always
 const submissionBlockers = []; // warnings; exit 1 only with --strict
 const warnings = []; // informational, never fatal
@@ -159,6 +187,29 @@ if (ascUsable) {
 		if (!occupying.length) ok.push('review slot free — a new App Store version could be created');
 		const live = versions.filter((v) => v.attributes.appStoreState === 'READY_FOR_SALE');
 		if (live.length) ok.push(`live: ${live.map((v) => 'v' + v.attributes.versionString).join(', ')}`);
+
+		// Once a version has been APPROVED, Apple refuses every later upload whose
+		// CFBundleShortVersionString is not strictly higher — TestFlight included
+		// (error 90062). Bumping CURRENT_PROJECT_VERSION does not satisfy it, so the
+		// build-number check above passes and the upload still dies. This cost a full
+		// signed archive on 2026-08-10 shipping 1.2 (18) after 1.2 went live.
+		const approved = versions
+			.filter((v) => APPROVED_STATES.has(v.attributes.appStoreState))
+			.map((v) => v.attributes.versionString);
+		const ceiling = approved.sort(cmpVersion).at(-1);
+		if (!ceiling) {
+			ok.push('no approved version yet — any MARKETING_VERSION is uploadable');
+		} else if (marketing.length !== 1) {
+			// the disagreement is already reported above; comparing would be arbitrary
+		} else if (cmpVersion(marketing[0], ceiling) > 0) {
+			ok.push(`MARKETING_VERSION ${marketing[0]} > highest approved v${ceiling}`);
+		} else {
+			uploadBlockers.push(
+				`MARKETING_VERSION ${marketing[0]} is not higher than the highest APPROVED version ` +
+					`v${ceiling} — Apple rejects the upload with error 90062, TestFlight included. ` +
+					`Bump MARKETING_VERSION (all ${build.length === 1 ? '' : 'mismatched '}configs: App + RestWidget, Debug + Release).`
+			);
+		}
 	}
 }
 
