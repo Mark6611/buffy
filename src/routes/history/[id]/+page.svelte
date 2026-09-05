@@ -26,14 +26,22 @@
 		byId = new Map(ex.map((e) => [e.id, e]));
 		// Lazy intensity backfill: the wearable's HR usually reaches Health well
 		// after the workout ended, so viewing a session is the natural retry point.
-		if (sess && (!sess.intensity || !sess.whoop || !sess.calories)) {
-			const updated = await captureSessionIntensity($state.snapshot(sess));
-			// patch the measured fields only — swapping the whole object would discard
-			// a note the user typed into the textarea while the backfill was in flight
-			if (updated && s) {
-				s.intensity = updated.intensity;
-				s.whoop = updated.whoop;
-				s.calories = updated.calories;
+		//
+		// Nested, with the OR on its own line, ON PURPOSE. This was
+		// `sess && (!sess.intensity || …)`, and the production bundle emits that
+		// shape with the grouping parentheses stripped (see exerciseSearch.ts), which
+		// turned a missing session into a TypeError here instead of a skipped backfill.
+		if (sess) {
+			const incomplete = !sess.intensity || !sess.whoop || !sess.calories;
+			if (incomplete) {
+				const updated = await captureSessionIntensity($state.snapshot(sess));
+				// patch the measured fields only — swapping the whole object would discard
+				// a note the user typed into the textarea while the backfill was in flight
+				if (updated && s) {
+					s.intensity = updated.intensity;
+					s.whoop = updated.whoop;
+					s.calories = updated.calories;
+				}
 			}
 		}
 	});

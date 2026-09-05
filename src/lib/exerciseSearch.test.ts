@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchesExercise, normalizeName, sameExerciseName } from '$lib/exerciseSearch';
+import { filterCatalog, matchesExercise, normalizeName, sameExerciseName } from '$lib/exerciseSearch';
 import type { Exercise } from '$lib/types';
 
 // Real rows from the seed catalog — the point of these tests is that the way a
@@ -129,5 +129,32 @@ describe('normalizeName', () => {
 	it('collapses punctuation runs to single spaces', () => {
 		expect(normalizeName('Machine Lat Pull Down Wide-Grip')).toBe('machine lat pull down wide grip');
 		expect(normalizeName('  Concept2  Rower!! ')).toBe('concept2 rower');
+	});
+});
+
+// The picker's row predicate. The "All" chip cases are the ones that shipped
+// broken: the combined boolean compiled with its parentheses stripped, so under
+// "All" every row passed and typing did nothing. See filterCatalog's comment.
+describe('filterCatalog', () => {
+	const all = [chestPress, latPulldown, plank, incBench, bicepCurl, pullups];
+
+	it('narrows by free text under the default "All" chip', () => {
+		expect(filterCatalog(all, 'All', 'bench')).toEqual([incBench]);
+	});
+
+	it('returns nothing for a query nothing matches — the picker then shows its empty state', () => {
+		expect(filterCatalog(all, 'All', 'zzzzqqq')).toEqual([]);
+	});
+
+	it('applies the equipment chip on its own and together with a query', () => {
+		expect(filterCatalog(all, 'Machine', '')).toEqual([latPulldown, chestPress]);
+		expect(filterCatalog(all, 'Machine', 'zzzzqqq')).toEqual([]);
+		expect(filterCatalog(all, 'Barbell', 'bench')).toEqual([incBench]);
+	});
+
+	it('sorts case-insensitively so a lowercase custom name lands among its neighbours', () => {
+		const custom = ex({ id: 'front-squat', name: 'front squat', equipment: 'barbell' });
+		const names = filterCatalog([plank, custom, incBench], 'All', '').map((e) => e.name);
+		expect(names).toEqual(['Barbell Incline Bench Press', 'front squat', 'Plank']);
 	});
 });

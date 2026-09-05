@@ -9,6 +9,7 @@
 // mid-set more than a miss does. Everything here is prefix/substring on normalized
 // text, which is cheap and predictable.
 import type { Exercise } from '$lib/types';
+import { equipLabel } from '$lib/format';
 
 /** Lowercase and collapse every run of non-alphanumerics to a single space, so
  *  "Pull-ups", "PULL UPS" and "pull  ups" all become the same token stream. */
@@ -49,6 +50,43 @@ export function matchesExercise(ex: Exercise, query: string): boolean {
 		const s = stem(t);
 		return words.some((w) => w.startsWith(s)) || compact.includes(s);
 	});
+}
+
+/**
+ * The picker's whole "which rows to show" step: equipment chip, then free text,
+ * then a case-insensitive name sort.
+ *
+ * Lives in this plain module ON PURPOSE, written as statements rather than one
+ * boolean. It used to be `(filter === 'All' || equipLabel(e.equipment) === filter)
+ * && matchesExercise(e, q)` inside the picker's $derived, and the production
+ * bundle emitted that with the grouping parentheses stripped — `All || (equip &&
+ * matches)` — so under the default "All" chip every row passed and typing did
+ * nothing.
+ *
+ * Where the drop happens (verified 2026-08-11, svelte 5.56.1 / vite 8.0.16 /
+ * rolldown 1.0.3): NOT Svelte's compiler — `compile()` on this exact source
+ * preserves the parens in dev and prod — and NOT the minifier, since a
+ * `--minify false` bundle already lacks them. It is Rolldown's handling of
+ * vite-plugin-svelte's output: in that same unminified bundle, identical shapes
+ * in plain .ts modules (sessionIntensity.ts) kept their parens verbatim, while
+ * every .svelte / .svelte.ts site lost them (this one, whoop.svelte.ts, the
+ * history detail page; editor.svelte.ts and the home page hit it earlier).
+ *
+ * So: mixed `||` / `&&` logic does not belong in a .svelte or .svelte.ts file.
+ * Put it in a plain module, or write it as statements. Unit tests pin this
+ * function's behaviour; e2e/picker.spec.ts pins it against the production
+ * bundle, the only place the bug can actually appear.
+ *
+ * The sort belongs here too: listExercises() returns IndexedDB key order (UTF-16
+ * code units), where every capitalised name sorts above every lowercase one, so a
+ * custom "front squat" would sink below the entire seeded catalog.
+ */
+export function filterCatalog(all: Exercise[], filter: string, query: string): Exercise[] {
+	const rows = all.filter((e) => {
+		if (filter !== 'All' && equipLabel(e.equipment) !== filter) return false;
+		return matchesExercise(e, query);
+	});
+	return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
 /** Do two exercise names refer to the same thing as far as a human is concerned?

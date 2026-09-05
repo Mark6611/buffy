@@ -6,7 +6,7 @@
 	import { workout } from '$lib/stores/workout.svelte';
 	import { editor } from '$lib/stores/editor.svelte';
 	import { equipLabel } from '$lib/format';
-	import { matchesExercise } from '$lib/exerciseSearch';
+	import { filterCatalog } from '$lib/exerciseSearch';
 	import type { Exercise } from '$lib/types';
 	import Icon from '$lib/components/Icon.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -35,16 +35,10 @@
 		loaded = true;
 	});
 
-	const shown = $derived(
-		all
-			.filter((e) => (filter === 'All' || equipLabel(e.equipment) === filter) && matchesExercise(e, q))
-			// listExercises() returns IndexedDB key order, which is UTF-16 code-unit order:
-			// every capitalised name sorts above every lowercase one, so a custom "front
-			// squat" would sink below the entire seeded catalog. Sort at read time instead
-			// of in the repository — the other consumers of that list build Maps from it
-			// and don't care about order.
-			.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-	);
+	// Filter + sort live in exerciseSearch.ts as plain statements. Do not inline a
+	// combined boolean here: see filterCatalog's comment for the build quirk that
+	// left this search doing nothing under the default chip.
+	const shown = $derived(filterCatalog(all, filter, q));
 
 	/** Hand the typed query and the swap slot to the custom-exercise form: retyping a
 	 *  name you just typed is friction, and a swap that detours through "create" is

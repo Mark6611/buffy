@@ -221,7 +221,15 @@ class WhoopStore {
 						// Guard against a concurrent reconnect: if this.tokens no longer holds
 						// the grant we set out to refresh, a fresh connect already replaced it —
 						// don't wipe the new tokens (or flip to disconnected) on our stale 400.
-						if ((r.status === 400 || r.status === 401) && this.tokens?.refreshToken === t.refreshToken) {
+						//
+						// Two named statements, NOT `(a || b) && c`: the production bundle
+						// (Svelte 5.56 through Vite 8 / Rolldown) emits that shape with the
+						// grouping parentheses stripped — evidence in exerciseSearch.ts — which
+						// turned this guard into `400 || (401 && ours)`: a stale 400 wiped a
+						// grant a concurrent reconnect had just installed.
+						const rejected = r.status === 400 || r.status === 401;
+						const stillOurGrant = this.tokens?.refreshToken === t.refreshToken;
+						if (rejected && stillOurGrant) {
 							await this.save(null);
 							this.today = null; // stop rendering a now-revoked connection's stats
 							this.todayFetchedMs = 0;
