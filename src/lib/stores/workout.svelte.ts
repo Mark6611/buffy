@@ -382,10 +382,9 @@ class WorkoutStore {
 				perSide: ex.loadType === 'per_side' ? true : undefined
 			}))
 		});
-		// Same one-liner swapExercise ends with: an exercise added mid-session has a
-		// history too, and without this a quick log shows no "last time" anchor at all
-		// (until an app relaunch, where hydrateMeta populates it — an odd inconsistency).
-		void this.hydrateSuggestionFor(ex);
+		// Same call swapExercise ends with: an exercise added mid-session has a history
+		// too — it feeds the "last time" readout AND primes the blank cells from it.
+		void this.hydrateSuggestionFor(ex, this.session.exercises[this.session.exercises.length - 1]);
 	}
 
 	/** Remove an exercise entirely from the in-progress workout (any logged sets on it are lost). */
@@ -457,15 +456,46 @@ class WorkoutStore {
 		}
 		this.setActiveToFirstIncomplete();
 		this.restLiveSync();
-		void this.hydrateSuggestionFor(newEx);
+		void this.hydrateSuggestionFor(newEx, s.exercises[exIndex]);
 	}
 
 	/** Fetch the last-time readout + suggestion for one exercise — used after a swap
 	 *  or an add. Not gated on autoProgression: the setting governs the suggested
-	 *  STEP, which the screen hides on its own; the history readout is always wanted. */
-	private async hydrateSuggestionFor(ex: Exercise) {
+	 *  STEP, which the screen hides on its own; the history readout is always wanted.
+	 *  With `prime` (the LoggedExercise the add/swap just created), its blank cells
+	 *  are filled from that same last session. */
+	private async hydrateSuggestionFor(ex: Exercise, prime?: LoggedExercise) {
 		const last = await getRepository().lastSessionForExercise(ex.id);
 		this.suggestions[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
+		if (prime && last) this.primeFromLast(ex, prime, last);
+	}
+
+	/**
+	 * Start a just-added exercise where you left it: fill the weight (or hold time)
+	 * column from the last session that logged it, the way a template-started
+	 * exercise already arrives with its targets. Top completed working weight — the
+	 * same anchor progression.ts and the template editor use.
+	 *
+	 * Only BLANK cells on UNLOGGED sets are touched. The fetch is async and the
+	 * picker lands the user on the table instantly, so a number typed while it was
+	 * in flight, or a set already ticked, is never overwritten. And `le` must still
+	 * be in the current session — swapped, removed or finished meanwhile means the
+	 * result has nowhere to go.
+	 */
+	private primeFromLast(ex: Exercise, le: LoggedExercise, last: WorkoutSession) {
+		if (!this.session?.exercises.includes(le)) return;
+		const done = last.exercises.find((e) => e.exerciseId === ex.id)?.sets.filter((s) => s.completed);
+		if (!done?.length) return;
+		if (ex.trackingType === 'weight_reps') {
+			if (ex.loadType === 'bodyweight') return;
+			const top = Math.max(0, ...done.map((s) => s.weight ?? 0));
+			if (!top) return;
+			for (const s of le.sets) if (!s.completed && s.weight == null) s.weight = top;
+		} else if (ex.trackingType === 'time_hold') {
+			const top = Math.max(0, ...done.map((s) => s.durationSec ?? 0));
+			if (!top) return;
+			for (const s of le.sets) if (!s.completed && s.durationSec == null) s.durationSec = top;
+		}
 	}
 
 	/** Move an exercise one slot up/down. Superset blocks travel as UNITS — the

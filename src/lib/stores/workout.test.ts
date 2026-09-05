@@ -3,7 +3,7 @@
 // restarts (WebView purge) — these tests simulate both by jumping the system
 // clock without ticking intervals, exactly what suspension looks like to JS.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Exercise, Template, WorkoutSession } from '$lib/types';
+import type { Exercise, LoggedSet, Template, WorkoutSession } from '$lib/types';
 
 const h = vi.hoisted(() => {
 	const upserted: unknown[] = [];
@@ -927,5 +927,91 @@ describe('addExercise', () => {
 		workout.addExercise(press);
 		await flush();
 		expect(workout.suggestions['press']?.last).toBe('10×12kg ×2');
+	});
+});
+
+describe('adding an exercise mid-workout primes blank cells from the last session', () => {
+	const prev = (sets: Partial<LoggedSet>[], exerciseId = 'press'): WorkoutSession => ({
+		id: 'prev',
+		startedAt: new Date(BASE - 86_400_000).toISOString(),
+		endedAt: new Date(BASE - 86_400_000 + 3_600_000).toISOString(),
+		sourceTemplateId: null,
+		title: 'prev',
+		exercises: [{ exerciseId, groupId: null, sets: sets.map((s, i) => ({ index: i, completed: true, ...s })) }]
+	});
+
+	it('fills every blank weight with the top completed working weight', async () => {
+		h.lastSession.value = prev([{ reps: 10, weight: 12 }, { reps: 10, weight: 14 }, { reps: 8, weight: 14 }]);
+		workout.startAdhoc();
+		workout.addExercise(press);
+		await flush();
+		expect(workout.session!.exercises[0].sets.map((s) => s.weight)).toEqual([14, 14, 14]);
+	});
+
+	it('never overwrites a weight typed while the lookup was in flight', async () => {
+		h.lastSession.value = prev([{ reps: 10, weight: 14 }]);
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.session!.exercises[0].sets[0].weight = 20; // typed before the fetch landed
+		await flush();
+		expect(workout.session!.exercises[0].sets.map((s) => s.weight)).toEqual([20, 14, 14]);
+	});
+
+	it('leaves a set that was already ticked alone', async () => {
+		h.lastSession.value = prev([{ reps: 10, weight: 14 }]);
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.toggleSet(0, 0); // logged blank, deliberately
+		await flush();
+		const sets = workout.session!.exercises[0].sets;
+		expect(sets[0].completed).toBe(true);
+		expect(sets[0].weight).toBeUndefined();
+		expect(sets[1].weight).toBe(14);
+	});
+
+	it('stays blank with no history, and for a bodyweight exercise', async () => {
+		h.lastSession.value = undefined;
+		workout.startAdhoc();
+		workout.addExercise(press);
+		await flush();
+		expect(workout.session!.exercises[0].sets.every((s) => s.weight == null)).toBe(true);
+
+		const pullups: Exercise = { ...press, id: 'pullups', name: 'Pull-ups', equipment: 'bodyweight', loadType: 'bodyweight' };
+		h.lastSession.value = prev([{ reps: 8, weight: 0 }], 'pullups');
+		workout.addExercise(pullups);
+		await flush();
+		expect(workout.session!.exercises[1].sets.every((s) => s.weight == null)).toBe(true);
+	});
+
+	it('primes hold time for a time-hold exercise', async () => {
+		const plank: Exercise = { ...press, id: 'plank', name: 'Plank', equipment: 'bodyweight', trackingType: 'time_hold', loadType: 'bodyweight' };
+		h.lastSession.value = prev([{ durationSec: 45 }, { durationSec: 60 }], 'plank');
+		workout.startAdhoc();
+		workout.addExercise(plank);
+		await flush();
+		expect(workout.session!.exercises[0].sets.map((s) => s.durationSec)).toEqual([60, 60, 60]);
+	});
+
+	it('primes a swapped-in exercise too', async () => {
+		h.lastSession.value = undefined;
+		workout.startAdhoc();
+		workout.addExercise(press);
+		await flush();
+		const curl: Exercise = { ...press, id: 'curl', name: 'Dumbbell Curl' };
+		h.lastSession.value = prev([{ reps: 12, weight: 16 }], 'curl');
+		workout.swapExercise(0, curl);
+		await flush();
+		expect(workout.session!.exercises[0].sets.map((s) => s.weight)).toEqual([16, 16, 16]);
+	});
+
+	it('writes nothing if the exercise was removed before the lookup landed', async () => {
+		h.lastSession.value = prev([{ reps: 10, weight: 14 }]);
+		workout.startAdhoc();
+		workout.addExercise(press);
+		workout.addExercise({ ...press, id: 'other', name: 'Other' });
+		workout.removeExercise(0); // the press row is gone before the fetch resolves
+		await flush();
+		expect(workout.session!.exercises).toHaveLength(1);
+		expect(workout.session!.exercises[0].exerciseId).toBe('other');
 	});
 });
