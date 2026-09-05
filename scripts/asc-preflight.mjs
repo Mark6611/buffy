@@ -60,7 +60,11 @@ const APPROVED_STATES = new Set([
 	'PROCESSING_FOR_APP_STORE',
 	'REPLACED_WITH_NEW_VERSION',
 	'DEVELOPER_REMOVED_FROM_SALE',
-	'REMOVED_FROM_SALE'
+	'REMOVED_FROM_SALE',
+	// passed review but not (yet) on sale — still "previously approved" to Apple
+	'ACCEPTED',
+	'PENDING_CONTRACT',
+	'PREORDER_READY_FOR_SALE'
 ]);
 
 /// Component-wise numeric compare, because a string compare puts 1.10 BELOW 1.9.
@@ -172,7 +176,7 @@ if (ascUsable) {
 
 	const vres = await asc(
 		'GET',
-		`/v1/apps/${APP_ID}/appStoreVersions?limit=10&fields[appStoreVersions]=versionString,appStoreState`
+		`/v1/apps/${APP_ID}/appStoreVersions?limit=200&fields[appStoreVersions]=versionString,appStoreState`
 	);
 	if (!vres.ok) {
 		uploadBlockers.push(`could not list versions: HTTP ${vres.status}`);
@@ -199,16 +203,21 @@ if (ascUsable) {
 		const ceiling = approved.sort(cmpVersion).at(-1);
 		if (!ceiling) {
 			ok.push('no approved version yet — any MARKETING_VERSION is uploadable');
-		} else if (marketing.length !== 1) {
-			// the disagreement is already reported above; comparing would be arbitrary
-		} else if (cmpVersion(marketing[0], ceiling) > 0) {
-			ok.push(`MARKETING_VERSION ${marketing[0]} > highest approved v${ceiling}`);
 		} else {
-			uploadBlockers.push(
-				`MARKETING_VERSION ${marketing[0]} is not higher than the highest APPROVED version ` +
-					`v${ceiling} — Apple rejects the upload with error 90062, TestFlight included. ` +
-					`Bump MARKETING_VERSION (all ${build.length === 1 ? '' : 'mismatched '}configs: App + RestWidget, Debug + Release).`
-			);
+			// Every DISTINCT value must clear the ceiling. A half-done bump (Xcode's
+			// General tab bumps only the selected target) leaves one config behind, and
+			// the disagreement on its own is only a submission warning in TestFlight
+			// mode — the archive would still burn before Apple's 90062.
+			const behind = marketing.filter((m) => cmpVersion(m, ceiling) <= 0);
+			if (behind.length === 0) {
+				ok.push(`MARKETING_VERSION ${marketing.join('/')} > highest approved v${ceiling}`);
+			} else {
+				uploadBlockers.push(
+					`MARKETING_VERSION ${behind.join('/')} is not higher than the highest APPROVED version ` +
+						`v${ceiling} — Apple rejects the upload with error 90062, TestFlight included. ` +
+						`Bump MARKETING_VERSION in all four configs (App + RestWidget, Debug + Release).`
+				);
+			}
 		}
 	}
 }

@@ -5,7 +5,7 @@
 import { getRepository } from '$lib/db';
 import type { Exercise, LoggedExercise, LoggedSet, WorkoutSession } from '$lib/types';
 import { settings } from './settings.svelte';
-import { computeSuggestion, type Suggestion } from '$lib/progression';
+import { computeSuggestion, topCompletedLoad, type Suggestion } from '$lib/progression';
 import { recovery } from './recovery.svelte';
 import {
 	haptic,
@@ -466,6 +466,10 @@ class WorkoutStore {
 	 *  are filled from that same last session. */
 	private async hydrateSuggestionFor(ex: Exercise, prime?: LoggedExercise) {
 		const last = await getRepository().lastSessionForExercise(ex.id);
+		// Removed or swapped away while the lookup was in flight: leave no trace.
+		// removeExercise/swapExercise deleted this entry on purpose; re-creating it
+		// here would resurrect a readout for an exercise no longer on screen.
+		if (!this.session?.exercises.some((e) => e.exerciseId === ex.id)) return;
 		this.suggestions[ex.id] = computeSuggestion(ex, last, { readiness: recovery.current?.band });
 		if (prime && last) this.primeFromLast(ex, prime, last);
 	}
@@ -473,8 +477,9 @@ class WorkoutStore {
 	/**
 	 * Start a just-added exercise where you left it: fill the weight (or hold time)
 	 * column from the last session that logged it, the way a template-started
-	 * exercise already arrives with its targets. Top completed working weight — the
-	 * same anchor progression.ts and the template editor use.
+	 * exercise already arrives with its targets. The anchor is progression.ts's
+	 * topCompletedLoad — the one definition the template editor and the "Last …"
+	 * suggestion share.
 	 *
 	 * Only BLANK cells on UNLOGGED sets are touched. The fetch is async and the
 	 * picker lands the user on the table instantly, so a number typed while it was
@@ -484,17 +489,12 @@ class WorkoutStore {
 	 */
 	private primeFromLast(ex: Exercise, le: LoggedExercise, last: WorkoutSession) {
 		if (!this.session?.exercises.includes(le)) return;
-		const done = last.exercises.find((e) => e.exerciseId === ex.id)?.sets.filter((s) => s.completed);
-		if (!done?.length) return;
-		if (ex.trackingType === 'weight_reps') {
-			if (ex.loadType === 'bodyweight') return;
-			const top = Math.max(0, ...done.map((s) => s.weight ?? 0));
-			if (!top) return;
-			for (const s of le.sets) if (!s.completed && s.weight == null) s.weight = top;
-		} else if (ex.trackingType === 'time_hold') {
-			const top = Math.max(0, ...done.map((s) => s.durationSec ?? 0));
-			if (!top) return;
-			for (const s of le.sets) if (!s.completed && s.durationSec == null) s.durationSec = top;
+		const top = topCompletedLoad(ex, last);
+		if (!top) return;
+		for (const s of le.sets) {
+			if (s.completed) continue;
+			if (top.weight != null && s.weight == null) s.weight = top.weight;
+			if (top.durationSec != null && s.durationSec == null) s.durationSec = top.durationSec;
 		}
 	}
 

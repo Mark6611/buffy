@@ -941,7 +941,16 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 	});
 
 	it('fills every blank weight with the top completed working weight', async () => {
-		h.lastSession.value = prev([{ reps: 10, weight: 12 }, { reps: 10, weight: 14 }, { reps: 8, weight: 14 }]);
+		// back-off on the last set: the anchor is the TOP completed load, not the last one
+		h.lastSession.value = prev([{ reps: 10, weight: 14 }, { reps: 10, weight: 14 }, { reps: 12, weight: 12 }]);
+		workout.startAdhoc();
+		workout.addExercise(press);
+		await flush();
+		expect(workout.session!.exercises[0].sets.map((s) => s.weight)).toEqual([14, 14, 14]);
+	});
+
+	it('ignores sets that were planned but never ticked in the last session', async () => {
+		h.lastSession.value = prev([{ reps: 10, weight: 14 }, { reps: 10, weight: 20, completed: false }]);
 		workout.startAdhoc();
 		workout.addExercise(press);
 		await flush();
@@ -977,7 +986,7 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 		expect(workout.session!.exercises[0].sets.every((s) => s.weight == null)).toBe(true);
 
 		const pullups: Exercise = { ...press, id: 'pullups', name: 'Pull-ups', equipment: 'bodyweight', loadType: 'bodyweight' };
-		h.lastSession.value = prev([{ reps: 8, weight: 0 }], 'pullups');
+		h.lastSession.value = prev([{ reps: 8, weight: 10 }], 'pullups'); // a logged load, so only the loadType guard can keep the cells blank
 		workout.addExercise(pullups);
 		await flush();
 		expect(workout.session!.exercises[1].sets.every((s) => s.weight == null)).toBe(true);
@@ -985,7 +994,7 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 
 	it('primes hold time for a time-hold exercise', async () => {
 		const plank: Exercise = { ...press, id: 'plank', name: 'Plank', equipment: 'bodyweight', trackingType: 'time_hold', loadType: 'bodyweight' };
-		h.lastSession.value = prev([{ durationSec: 45 }, { durationSec: 60 }], 'plank');
+		h.lastSession.value = prev([{ durationSec: 60 }, { durationSec: 45 }], 'plank');
 		workout.startAdhoc();
 		workout.addExercise(plank);
 		await flush();
@@ -1009,9 +1018,15 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 		workout.startAdhoc();
 		workout.addExercise(press);
 		workout.addExercise({ ...press, id: 'other', name: 'Other' });
+		const removed = workout.session!.exercises[0];
 		workout.removeExercise(0); // the press row is gone before the fetch resolves
 		await flush();
 		expect(workout.session!.exercises).toHaveLength(1);
 		expect(workout.session!.exercises[0].exerciseId).toBe('other');
+		// the 14 landed nowhere: not on the detached row, not on whoever now sits at
+		// index 0 — and the readout for the removed exercise was not resurrected
+		expect(removed.sets.every((s) => s.weight == null)).toBe(true);
+		expect(workout.session!.exercises[0].sets.every((s) => s.weight == null)).toBe(true);
+		expect(workout.suggestions['press']).toBeUndefined();
 	});
 });

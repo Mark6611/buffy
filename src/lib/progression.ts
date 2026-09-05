@@ -89,3 +89,31 @@ export function computeSuggestion(
 		heldForRecovery: held
 	};
 }
+
+/**
+ * The load anchor the two primers and the suggestion all share: the heaviest
+ * COMPLETED set (or longest completed hold) of the last session that logged this
+ * exercise. null when there is nothing to anchor on — no session, no completed
+ * sets, a bodyweight or cardio exercise, or a zero load.
+ *
+ * One definition on purpose. The template editor and the live workout used to
+ * hand-roll this separately, and "agree today" is not a guarantee.
+ */
+export function topCompletedLoad(
+	ex: Exercise,
+	last: WorkoutSession | undefined
+): { weight?: number; durationSec?: number } | null {
+	if (!last) return null;
+	const done = last.exercises.find((e) => e.exerciseId === ex.id)?.sets.filter((s) => s.completed);
+	if (!done?.length) return null;
+	if (ex.trackingType === 'weight_reps') {
+		if (ex.loadType === 'bodyweight') return null;
+		const weight = Math.max(0, ...done.map((s) => s.weight ?? 0));
+		return weight ? { weight } : null;
+	}
+	if (ex.trackingType === 'time_hold') {
+		const durationSec = Math.max(0, ...done.map((s) => s.durationSec ?? 0));
+		return durationSec ? { durationSec } : null;
+	}
+	return null;
+}

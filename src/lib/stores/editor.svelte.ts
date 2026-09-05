@@ -1,5 +1,6 @@
 // Draft state for the template editor. Edits a working copy; commits via save().
 import { getRepository } from "$lib/db";
+import { topCompletedLoad } from "$lib/progression";
 import { newId } from "$lib/id";
 import type {
   Exercise,
@@ -149,26 +150,27 @@ class EditorStore {
   }
 
   /**
-   * Fill the blank weight column from the last session that actually logged this
-   * exercise — the top working weight, the same anchor progression.ts uses. Only
-   * touches sets that are still blank, so it can never overwrite a number the user
-   * typed while this was in flight (the picker lands them on the editor instantly).
+   * Fill the blank weight (or hold-time) column from the last session that actually
+   * logged this exercise — progression.ts's topCompletedLoad, the same anchor the
+   * live workout's primer and the "Last …" suggestion use. Only touches sets that
+   * are still blank, so it can never overwrite a number the user typed while this
+   * was in flight (the picker lands them on the editor instantly).
    */
   private async primeWeightFrom(
     ex: Exercise,
     te: TemplateExercise,
     draft: Template
   ) {
-    if (ex.trackingType !== "weight_reps" || ex.loadType === "bodyweight") return;
+    if (ex.trackingType !== "weight_reps" && ex.trackingType !== "time_hold") return;
     const last = await getRepository().lastSessionForExercise(ex.id);
-    const done = last?.exercises
-      .find((e) => e.exerciseId === ex.id)
-      ?.sets.filter((s) => s.completed);
-    if (!done?.length) return;
-    const top = Math.max(0, ...done.map((s) => s.weight ?? 0));
+    const top = topCompletedLoad(ex, last);
     if (!top) return;
     if (this.draft !== draft) return; // a different template was loaded meanwhile
-    for (const ps of te.plannedSets) if (ps.targetWeight == null) ps.targetWeight = top;
+    for (const ps of te.plannedSets) {
+      if (top.weight != null && ps.targetWeight == null) ps.targetWeight = top.weight;
+      if (top.durationSec != null && ps.targetDurationSec == null)
+        ps.targetDurationSec = top.durationSec;
+    }
   }
 
   removeExercise(i: number) {

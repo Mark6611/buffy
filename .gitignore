@@ -31,3 +31,6 @@ vite.config.ts.timestamp-*
 /playwright-report
 /blob-report
 /.playwright
+
+# Generated App Store screenshots — regenerate with scripts/gen-shots.mjs
+/appstore-screenshots*/

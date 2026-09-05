@@ -112,16 +112,23 @@ async function uploadOne(setId, dir, file) {
 	return id;
 }
 
+// Everything that can fail without touching ASC happens first, for EVERY device:
+// no DELETE is issued until all replacement sets are confirmed on disk. Checking
+// per device (as the coffee original does) lets a missing iPad directory strand a
+// half-replaced listing after the iPhone set was already cleared and re-uploaded.
+const staged = new Map();
 for (const dev of DEVICES) {
 	const dir = join(REPO, dev.dir);
-	// Everything that can fail without touching ASC happens first: no DELETE is
-	// issued until we know there are replacement images on disk to upload.
 	const files = readdirSync(dir)
 		.filter((f) => f.endsWith('.png'))
 		.sort();
 	if (files.length === 0)
 		throw new Error(`${dir} contains no .png — refusing to clear ${dev.displayType}`);
+	staged.set(dev.displayType, { dir, files });
+}
 
+for (const dev of DEVICES) {
+	const { dir, files } = staged.get(dev.displayType);
 	const setId = await findOrCreateSet(dev.displayType);
 	const already = (await setScreenshots(setId)).length;
 	if (already > 0) {
