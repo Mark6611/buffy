@@ -84,7 +84,8 @@ function jumpClock(sec: number) {
 	workout.nowMs = Date.now();
 }
 
-/** Flush the microtask chain of restore()'s async hydrateMeta. */
+/** Flush the microtask chain of the store's detached async fetches —
+ *  restore()'s hydrateMeta and the add/swap hydrateSuggestionFor + primer. */
 async function flush() {
 	for (let i = 0; i < 6; i++) await Promise.resolve();
 }
@@ -117,6 +118,26 @@ function resumeSnapshot(over: Record<string, unknown> = {}) {
 		restStartedAtMs: BASE - 90 * 1000, // rest began 90s ago
 		restAccumSec: 0,
 		...over
+	};
+}
+
+/** A finished session in history, yesterday, every set completed unless the
+ *  caller says otherwise. The shared fixture for the "last time" readout and the
+ *  add/swap primer — three copies of this literal used to drift independently. */
+function prevSession(sets: Partial<LoggedSet>[], exerciseId = 'press'): WorkoutSession {
+	return {
+		id: 'prev',
+		startedAt: new Date(BASE - 86_400_000).toISOString(),
+		endedAt: new Date(BASE - 86_400_000 + 3_600_000).toISOString(),
+		sourceTemplateId: null,
+		title: 'prev',
+		exercises: [
+			{
+				exerciseId,
+				groupId: null,
+				sets: sets.map((st, i) => ({ index: i, completed: true, ...st }))
+			}
+		]
 	};
 }
 
@@ -689,14 +710,7 @@ describe('startFromTemplate', () => {
 	it('reads the last-time history even with auto-progression off', async () => {
 		// the setting governs the suggested STEP; the history readout is not the feature
 		expect(h.settings.current.autoProgression).toBe(false);
-		h.lastSession.value = {
-			id: 'prev',
-			startedAt: new Date(BASE - 86_400_000).toISOString(),
-			endedAt: new Date(BASE - 86_400_000).toISOString(),
-			sourceTemplateId: null,
-			title: 'prev',
-			exercises: [{ exerciseId: 'press', groupId: null, sets: [{ index: 0, completed: true, reps: 10, weight: 12 }] }]
-		};
+		h.lastSession.value = prevSession([{ reps: 10, weight: 12 }]);
 		h.template.value = templateWith(['press']);
 		await workout.startFromTemplate('tpl-1');
 		expect(workout.suggestions['press']?.last).toBe('10×12kg ×2');
@@ -915,14 +929,7 @@ describe('resume snapshot carries exercise metadata', () => {
 
 describe('addExercise', () => {
 	it('reads the added exercise history so the "last time" anchor appears', async () => {
-		h.lastSession.value = {
-			id: 'prev',
-			startedAt: new Date(BASE - 86_400_000).toISOString(),
-			endedAt: new Date(BASE - 86_400_000).toISOString(),
-			sourceTemplateId: null,
-			title: 'prev',
-			exercises: [{ exerciseId: 'press', groupId: null, sets: [{ index: 0, completed: true, reps: 10, weight: 12 }] }]
-		};
+		h.lastSession.value = prevSession([{ reps: 10, weight: 12 }]);
 		await workout.startAdhoc();
 		workout.addExercise(press);
 		await flush();
@@ -931,18 +938,9 @@ describe('addExercise', () => {
 });
 
 describe('adding an exercise mid-workout primes blank cells from the last session', () => {
-	const prev = (sets: Partial<LoggedSet>[], exerciseId = 'press'): WorkoutSession => ({
-		id: 'prev',
-		startedAt: new Date(BASE - 86_400_000).toISOString(),
-		endedAt: new Date(BASE - 86_400_000 + 3_600_000).toISOString(),
-		sourceTemplateId: null,
-		title: 'prev',
-		exercises: [{ exerciseId, groupId: null, sets: sets.map((s, i) => ({ index: i, completed: true, ...s })) }]
-	});
-
 	it('fills every blank weight with the top completed working weight', async () => {
 		// back-off on the last set: the anchor is the TOP completed load, not the last one
-		h.lastSession.value = prev([{ reps: 10, weight: 14 }, { reps: 10, weight: 14 }, { reps: 12, weight: 12 }]);
+		h.lastSession.value = prevSession([{ reps: 10, weight: 14 }, { reps: 10, weight: 14 }, { reps: 12, weight: 12 }]);
 		workout.startAdhoc();
 		workout.addExercise(press);
 		await flush();
@@ -950,7 +948,7 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 	});
 
 	it('ignores sets that were planned but never ticked in the last session', async () => {
-		h.lastSession.value = prev([{ reps: 10, weight: 14 }, { reps: 10, weight: 20, completed: false }]);
+		h.lastSession.value = prevSession([{ reps: 10, weight: 14 }, { reps: 10, weight: 20, completed: false }]);
 		workout.startAdhoc();
 		workout.addExercise(press);
 		await flush();
@@ -958,7 +956,7 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 	});
 
 	it('never overwrites a weight typed while the lookup was in flight', async () => {
-		h.lastSession.value = prev([{ reps: 10, weight: 14 }]);
+		h.lastSession.value = prevSession([{ reps: 10, weight: 14 }]);
 		workout.startAdhoc();
 		workout.addExercise(press);
 		workout.session!.exercises[0].sets[0].weight = 20; // typed before the fetch landed
@@ -967,7 +965,7 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 	});
 
 	it('leaves a set that was already ticked alone', async () => {
-		h.lastSession.value = prev([{ reps: 10, weight: 14 }]);
+		h.lastSession.value = prevSession([{ reps: 10, weight: 14 }]);
 		workout.startAdhoc();
 		workout.addExercise(press);
 		workout.toggleSet(0, 0); // logged blank, deliberately
@@ -986,7 +984,7 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 		expect(workout.session!.exercises[0].sets.every((s) => s.weight == null)).toBe(true);
 
 		const pullups: Exercise = { ...press, id: 'pullups', name: 'Pull-ups', equipment: 'bodyweight', loadType: 'bodyweight' };
-		h.lastSession.value = prev([{ reps: 8, weight: 10 }], 'pullups'); // a logged load, so only the loadType guard can keep the cells blank
+		h.lastSession.value = prevSession([{ reps: 8, weight: 10 }], 'pullups'); // a logged load, so only the loadType guard can keep the cells blank
 		workout.addExercise(pullups);
 		await flush();
 		expect(workout.session!.exercises[1].sets.every((s) => s.weight == null)).toBe(true);
@@ -994,7 +992,7 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 
 	it('primes hold time for a time-hold exercise', async () => {
 		const plank: Exercise = { ...press, id: 'plank', name: 'Plank', equipment: 'bodyweight', trackingType: 'time_hold', loadType: 'bodyweight' };
-		h.lastSession.value = prev([{ durationSec: 60 }, { durationSec: 45 }], 'plank');
+		h.lastSession.value = prevSession([{ durationSec: 60 }, { durationSec: 45 }], 'plank');
 		workout.startAdhoc();
 		workout.addExercise(plank);
 		await flush();
@@ -1007,14 +1005,14 @@ describe('adding an exercise mid-workout primes blank cells from the last sessio
 		workout.addExercise(press);
 		await flush();
 		const curl: Exercise = { ...press, id: 'curl', name: 'Dumbbell Curl' };
-		h.lastSession.value = prev([{ reps: 12, weight: 16 }], 'curl');
+		h.lastSession.value = prevSession([{ reps: 12, weight: 16 }], 'curl');
 		workout.swapExercise(0, curl);
 		await flush();
 		expect(workout.session!.exercises[0].sets.map((s) => s.weight)).toEqual([16, 16, 16]);
 	});
 
 	it('writes nothing if the exercise was removed before the lookup landed', async () => {
-		h.lastSession.value = prev([{ reps: 10, weight: 14 }]);
+		h.lastSession.value = prevSession([{ reps: 10, weight: 14 }]);
 		workout.startAdhoc();
 		workout.addExercise(press);
 		workout.addExercise({ ...press, id: 'other', name: 'Other' });
