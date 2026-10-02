@@ -26,13 +26,34 @@ Local-first: the canonical database is on-device IndexedDB; CloudKit is an opt-i
 - Dexie schema: NEVER edit an existing `.version()` block — append a new one with
   `.upgrade()` for backfills.
 
+## Layout (phones, iPad, and the iPhone Duo)
+- `.app` has two width bands, split at 700px (`src/app.css`): at or below it the
+  column FILLS the viewport — every iPhone and the iPhone Duo in every pose (outer
+  466pt, inner 669pt, Split View ~334pt); above it a centred 440px column floats
+  (desktop, iPad). Never reintroduce a fixed column width below the band — on the
+  Duo that recreates the "compatibility mode" look in CSS.
+- Safe areas: handle `env(safe-area-inset-left)` and `-right` SEPARATELY — the
+  Duo's system controls sit down one edge of the inner display and which edge
+  depends on pose and Split View placement. Backgrounds reach the screen edge;
+  content moves inside the insets (`.screen` and `.sheet` do this).
+- The Duo resizes the window continuously while folding: never cache
+  `innerWidth`, never branch on orientation; let CSS reflow. Charts are
+  `viewBox` + `width=100%` for this reason.
+- Verify with `node scripts/verify-duo-layout.mjs` after `npm run build:ios`.
+- The native side only sees these sizes once the app is built with the iOS 27.1 SDK
+  (Xcode 27.1+); an older SDK gets a phone-sized compatibility window on the Duo.
+
 ## Svelte gotchas (both have shipped real crashes)
 - `$state` objects are Proxies: `$state.snapshot()` before ANY IndexedDB write,
   structured clone, or native bridge call.
-- **Svelte ~5.55 compiler bug:** never write `a && (b != null || c != null)` in a
-  `.svelte` file — the compiler DROPS the parentheses when rewriting `!=` (dev AND
-  prod; svelte-check stays green). Early-return instead, then a pure `||` chain of
-  `typeof x === 'number'` checks. When in doubt, curl the dev server's compiled output.
+- **Build-time paren drop:** mixed `||` / `&&` logic in a `.svelte` or `.svelte.ts`
+  file ships with its grouping parentheses stripped — `(a || b) && c` becomes
+  `a || (b && c)`. Verified (2026-09-05) to be Rolldown's handling of
+  vite-plugin-svelte output, NOT Svelte's compiler and NOT the minifier; plain `.ts`
+  keeps its parens. Four shipped bugs so far. Put such logic in a plain `.ts` module
+  or write it as statements. svelte-check and vitest cannot see it — only a
+  production-bundle E2E can (e2e/picker.spec.ts pins the last one). Full write-up:
+  `src/lib/exerciseSearch.ts`.
 
 ## Editing hygiene
 - The `.svelte` files here are large. After a context compaction, Edit's read-state is
@@ -56,6 +77,9 @@ Local-first: the canonical database is on-device IndexedDB; CloudKit is an opt-i
 - `npm test` (vitest), `npm run check` (svelte-check must be 0 errors / 0 warnings),
   `npm run test:e2e` (Playwright; gesture tests use real mouse simulation — synthetic
   PointerEvent dispatch is unreliable).
+- Layout at the iPhone Duo's viewports + the fold transition:
+  `npm run build:ios && node scripts/verify-duo-layout.mjs` (no Duo simulator is
+  needed; the WebView is the whole UI).
 - iOS compile check without signing:
   `xcodebuild ... CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive`.
 

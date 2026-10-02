@@ -231,7 +231,13 @@ const DEVICES = [
 	// iPad 12.9" 2048x2732: Buffy is phone-first (~590px column), so a 1024-wide viewport
 	// marooned the UI in empty margins. Render the phone layout full-bleed at 512x683 @ dsf 4
 	// (= 2048x2732) so the "scaled phone UI" fills the frame instead.
-	{ dir: 'appstore-screenshots-ipad13', viewport: { width: 512, height: 683 }, dsf: 4 }
+	{ dir: 'appstore-screenshots-ipad13', viewport: { width: 512, height: 683 }, dsf: 4 },
+	// iPhone Duo — Apple's App Store Connect sizes, rendered at the device's real
+	// logical points so these are the screens the Duo actually shows (the app fills
+	// both displays — see .app in app.css). ASC says upload support for this device
+	// "will be available later this year"; generate now, upload once it lands.
+	{ dir: 'appstore-screenshots-duo-outer', viewport: { width: 466, height: 678 }, dsf: 3 }, // 1398x2034
+	{ dir: 'appstore-screenshots-duo-inner', viewport: { width: 669, height: 951 }, dsf: 3 } // 2007x2853
 ];
 
 async function run() {

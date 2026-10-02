@@ -40,6 +40,11 @@ console.log(`target localization ${VER_LOC}${REPLACE ? ' (replacing existing)' :
 const DEVICES = [
 	{ displayType: 'APP_IPHONE_65', dir: 'appstore-screenshots-6.5' }, // 1242×2688
 	{ displayType: 'APP_IPAD_PRO_3GEN_129', dir: 'appstore-screenshots-ipad13' } // 2048×2732
+	// iPhone Duo: gen-shots.mjs already produces appstore-screenshots-duo-outer/
+	// (1398×2034) and -duo-inner/ (2007×2853). They are NOT listed here yet because
+	// App Store Connect does not accept Duo assets ("available later this year", per
+	// Apple's screenshot specifications) and the screenshotDisplayType enum values
+	// are unpublished. Add the two entries once Apple documents them.
 ];
 
 async function findOrCreateSet(displayType) {

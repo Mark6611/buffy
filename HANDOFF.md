@@ -146,7 +146,7 @@ npm run ios:open     # Xcode
 | `asc-api.mjs` | Minimal ASC REST client (ES256 JWT). `GET/POST/PATCH <path> [json]`. |
 | `asc-screenshots.mjs <locId> [--replace]` | Uploads the two screenshot sets. `--replace` is required for a new version, because ASC carries the old images forward. |
 | `gen-shots.mjs` | Regenerates all 12 App Store screenshots from a seeded production build. |
-| `verify-*.mjs` | Accessibility gates: contrast, hit targets, semantics, Dynamic Type. |
+| `verify-*.mjs` | Accessibility gates: contrast, hit targets, semantics, Dynamic Type. `verify-duo-layout.mjs` drives the iPhone Duo's viewports and the fold transition (needs `npm run build:ios` first). |
 
 CI (`.github/workflows/ci.yml`) runs check + unit + build, and E2E in a second job.
 
@@ -178,6 +178,13 @@ CI (`.github/workflows/ci.yml`) runs check + unit + build, and E2E in a second j
 7. **Pinch-zoom is disabled app-wide** by Capacitor (`zoomingEnabled` defaults to NO), so
    never claim it works. Re-enabling it is a real WCAG 1.4.4 question and a
    `capacitor.config.ts` change.
+8. **iPhone Duo is two displays and a continuous resize.** Outer 466x678pt, inner
+   669x951pt, Split View on the inner ~334pt. iOS only hands the WebView those sizes
+   when the app is built with the **iOS 27.1 SDK (Xcode 27.1+)** — older SDKs get a
+   phone-sized compatibility window. The web layer is ready: `.app` fills the viewport
+   up to 700px and floats a 440px column above it; `.screen` and `.sheet` inset left and
+   right **independently** (the Duo's safe areas are asymmetric); nothing caches the
+   viewport, so folding just reflows. `scripts/verify-duo-layout.mjs` is the gate.
 
 ---
 
@@ -203,6 +210,25 @@ still ships broken, plus two other paren-drop sites, and prefills a mid-workout
 exercise's weight from your last session.
 
 **Open items:**
+
+- **iPhone Duo — one step left, and it needs you.** The web layer is adapted and
+  verified at the Duo's exact viewports (section 5, trap 8), the native config is
+  already clean (no `UIRequiresFullScreen`, no `UIScreen.main`, no SDK pin), and the
+  App Store screenshots exist in `appstore-screenshots-duo-outer/` (1398x2034) and
+  `-duo-inner/` (2007x2853). What remains: **build with the iOS 27.1 SDK**, which means
+  installing Xcode 27.1 (beta as of 2026-10-02; needs an Apple ID, so not something an
+  agent can do), then `scripts/ship.sh` as usual. Until then the Duo runs the app in
+  compatibility mode: it works, phone-sized, centred. Open-and-turned to landscape
+  (951pt) the column floats at 440 like iPad — deliberate, see the verifier. Separately,
+  App Store Connect does not accept Duo screenshot uploads yet ("later this year") —
+  `asc-screenshots.mjs` has the note; add the two display types once Apple publishes
+  the enum.
+- **An Apple agreement has lapsed — nothing can ship until it is accepted.** As of
+  2026-10-02 every App Store Connect API call returns
+  `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`, which means the preflight, the
+  upload and any submission fail before they start. Only the Account Holder can fix
+  it: App Store Connect → Agreements, Tax, and Banking → accept the updated agreement.
+  Not a code problem; an agent cannot do it.
 
 - **Dynamic Type has never had its on-device XXXL/AX pass**, though it is now live in
   1.3. If a version is ever rejected on layout, look there first.

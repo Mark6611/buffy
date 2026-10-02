@@ -111,8 +111,10 @@ body {
 }
 
 /* Prevent iOS Safari from zooming when a field is focused: force >=16px form
-   controls on phones. !important beats the 15px set-table inputs. */
-@media (max-width: 600px) {
+   controls on phones. !important beats the 15px set-table inputs. The band
+   matches --app-fill-max below so the iPhone Duo's 669pt inner display is
+   covered too. */
+@media (max-width: 700px) {
   input,
   textarea,
   select {
@@ -122,8 +124,19 @@ body {
   }
 }
 
-/* The real app viewport: a centered phone-width column.
-   On desktop it floats as a device; on a phone it fills the screen. */
+/* The real app viewport. Two bands, split at 700px:
+
+   ≤ 700px — FILL the viewport. Every iPhone, and the iPhone Duo in all of its
+             poses: outer display 466pt, inner display 669pt, Split View ~334pt.
+             A fixed 440px column here left 13pt gutters on the Duo's outer display
+             and floated a phone-sized app in the middle of the inner one — the
+             same "compatibility mode" look iOS gives unadapted apps, except
+             self-inflicted in CSS after the iOS 27.1 SDK had removed it.
+   > 700px  — a centred 440px column that floats as a device (desktop web, iPad).
+             Unchanged from before.
+
+   The band is a plain max-width, not a size-class check: the Duo resizes the
+   window continuously as it folds, and layout must follow every frame. */
 .app {
   position: relative;
   max-width: 440px;
@@ -147,7 +160,12 @@ body {
      A native app has no double-tap-zoom gesture to suppress — see native-pilot/. */
   touch-action: manipulation;
 }
-@media (min-width: 480px) {
+@media (max-width: 700px) {
+  .app {
+    max-width: none;
+  }
+}
+@media (min-width: 701px) {
   .app {
     box-shadow: 0 0 0 1px var(--line), 0 30px 60px -20px rgba(0, 0, 0, 0.18);
   }
@@ -161,6 +179,13 @@ body {
   flex-direction: column;
   background: var(--paper);
   padding-top: env(safe-area-inset-top, 0);
+  /* Left and right handled SEPARATELY, never mirrored from one side: on the
+     iPhone Duo the vertical system controls sit down one edge of the inner
+     display, and which edge depends on pose and Split View placement. The
+     background is this box, so it still reaches the screen edge; only the
+     content moves inside the insets. */
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
 }
 .screen-body {
   flex: 1;
@@ -610,7 +635,9 @@ a.chip:active {
   max-width: 480px;
   margin: 0 auto;
   border-radius: 26px 26px 0 0;
-  padding: 22px 20px calc(30px + env(safe-area-inset-bottom, 0));
+  /* fixed to the viewport, so .screen's side insets do not reach it */
+  padding: 22px calc(20px + env(safe-area-inset-right, 0)) calc(30px + env(safe-area-inset-bottom, 0))
+    calc(20px + env(safe-area-inset-left, 0));
   --glass-opacity: 0.86;
   --glass-blur: 24px;
   background-color: rgb(255 255 255 / var(--glass-opacity));
