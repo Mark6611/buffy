@@ -33,6 +33,7 @@
 		EBEA85E4D5A4C8901016BC40 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */; };
 		EEF134EDC73906B2EA631531 /* RestAdjustmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04F7DC7037BE6F1FC9BEFB0 /* RestAdjustmentStore.swift */; };
 		F74E5771E0A02710608AF937 /* CloudSyncPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84033E342C0F26A197A7292B /* CloudSyncPlugin.swift */; };
+		A378BEC7CD5740DD94B2B286 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A049CD00504CABBCC64B66 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,6 +88,7 @@
 		F1723A7F107B929156A54C79 /* WidgetDataPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetDataPlugin.swift; path = App/WidgetDataPlugin.swift; sourceTree = "<group>"; };
 		F3690937977D5F0454EAFB0D /* RestWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestWidgetBundle.swift; path = RestWidget/RestWidgetBundle.swift; sourceTree = "<group>"; };
 		F98DAF141CA78950AAA46AE3 /* BuffyHomeWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BuffyHomeWidget.swift; path = RestWidget/BuffyHomeWidget.swift; sourceTree = "<group>"; };
+		C8A049CD00504CABBCC64B66 /* SceneDelegate.swift */ = {isa = PBXFileReference; name = "SceneDelegate.swift"; path = "SceneDelegate.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +164,7 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				C8A049CD00504CABBCC64B66 /* SceneDelegate.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -222,8 +225,8 @@
 		504EC2FC1FED79650016851F /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 0920;
-				LastUpgradeCheck = 0920;
+				LastSwiftUpdateCheck = 920;
+				LastUpgradeCheck = 920;
 				TargetAttributes = {
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
@@ -292,6 +295,7 @@
 				EEF134EDC73906B2EA631531 /* RestAdjustmentStore.swift in Sources */,
 				F74E5771E0A02710608AF937 /* CloudSyncPlugin.swift in Sources */,
 				37320AB035548DDC43D3A6BA /* CloudSyncSafeContainer.m in Sources */,
+				A378BEC7CD5740DD94B2B286 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

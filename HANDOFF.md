@@ -185,6 +185,14 @@ CI (`.github/workflows/ci.yml`) runs check + unit + build, and E2E in a second j
    up to 700px and floats a 440px column above it; `.screen` and `.sheet` inset left and
    right **independently** (the Duo's safe areas are asymmetric); nothing caches the
    viewport, so folding just reflows. `scripts/verify-duo-layout.mjs` is the gate.
+9. **Building with Xcode 27 crashed the app at launch on iOS 27 — the fix is in, keep
+   it.** UIKit requires the UIScene lifecycle for apps built with the iOS 27 SDK and
+   traps otherwise (~6s in, SIGTRAP). Shipped SDK-26 builds were never affected (it is
+   a linked-on gate), so App Store users on iOS 27 were fine; every Xcode 27 build was
+   not. Adopted via Capacitor 8.5: `SceneDelegate.swift` owns the window; its root
+   **must remain `ViewController()`** — the template's `CAPBridgeViewController()`
+   silently drops all four app-local plugins. Verified on iOS 27.0 and 26.5
+   simulators by polling the process past 16s and seeing the home screen render.
 
 ---
 
@@ -211,24 +219,25 @@ exercise's weight from your last session.
 
 **Open items:**
 
-- **iPhone Duo — one step left, and it needs you.** The web layer is adapted and
-  verified at the Duo's exact viewports (section 5, trap 8), the native config is
-  already clean (no `UIRequiresFullScreen`, no `UIScreen.main`, no SDK pin), and the
-  App Store screenshots exist in `appstore-screenshots-duo-outer/` (1398x2034) and
-  `-duo-inner/` (2007x2853). What remains: **build with the iOS 27.1 SDK**, which means
-  installing Xcode 27.1 (beta as of 2026-10-02; needs an Apple ID, so not something an
-  agent can do), then `scripts/ship.sh` as usual. Until then the Duo runs the app in
-  compatibility mode: it works, phone-sized, centred. Open-and-turned to landscape
-  (951pt) the column floats at 440 like iPad — deliberate, see the verifier. Separately,
-  App Store Connect does not accept Duo screenshot uploads yet ("later this year") —
-  `asc-screenshots.mjs` has the note; add the two display types once Apple publishes
-  the enum.
-- **An Apple agreement has lapsed — nothing can ship until it is accepted.** As of
-  2026-10-02 every App Store Connect API call returns
-  `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`, which means the preflight, the
-  upload and any submission fail before they start. Only the Account Holder can fix
-  it: App Store Connect → Agreements, Tax, and Banking → accept the updated agreement.
-  Not a code problem; an agent cannot do it.
+- **iPhone Duo — code is done; shipping needs two things only you can do.** The web
+  layer is adapted and verified at the Duo's exact viewports (trap 8); the native shell
+  now builds and launches on iOS 27 (trap 9, Capacitor 8.5.3, Xcode 27.0 installed
+  2026-10); Duo screenshots exist in `appstore-screenshots-duo-outer/` (1398x2034) and
+  `-duo-inner/` (2007x2853). With the iOS 27.0 SDK the app already fills the Duo's
+  inner display minus the status-bar strip; true edge-to-edge needs the **27.1 SDK —
+  Xcode 27.1 is at Release Candidate** (Apple ID download) and Apple accepts Duo
+  submissions built with it. Open-and-turned to landscape (951pt) the column floats at
+  440 like iPad — deliberate. ASC does not accept Duo screenshot uploads yet ("later
+  this year") — `asc-screenshots.mjs` has the note. **Still unverified:** a `buffy://`
+  URL-scheme open on iOS 27 (Whoop's OAuth return) — the scene path is Capacitor's own
+  `SceneDelegateProxy`, but iOS's "Open in Buffy?" confirm needs a tap on the simulator
+  that no session has had access to yet.
+- **The Apple Developer Program License Agreement was updated and is unaccepted —
+  nothing can ship until it is.** Every App Store Connect API call returns
+  `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`, so preflight, upload and
+  submission all fail before they start. Accept it at developer.apple.com/account →
+  "Review agreement" → **Agree** (the Account Holder, i.e. you — this is an Individual
+  enrollment). Not a code problem; an agent should not click a legal agreement.
 
 - **Dynamic Type has never had its on-device XXXL/AX pass**, though it is now live in
   1.3. If a version is ever rejected on layout, look there first.

@@ -43,6 +43,24 @@ Local-first: the canonical database is on-device IndexedDB; CloudKit is an opt-i
 - The native side only sees these sizes once the app is built with the iOS 27.1 SDK
   (Xcode 27.1+); an older SDK gets a phone-sized compatibility window on the Duo.
 
+## iOS 27 SDK: the scene lifecycle is mandatory (shipped a launch crash in testing)
+- An app built with the iOS 27 SDK that has no `UIApplicationSceneManifest` is killed
+  by UIKit ~6s after launch on iOS 27 (SIGTRAP in
+  `UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`). It is a
+  linked-on-SDK gate: the same binary runs fine on iOS 26, and SDK-26 builds run fine
+  on iOS 27 — so it only appears the first time you build with Xcode 27.
+- Buffy adopted it with Capacitor 8.5 (`npx cap migrate` → `migrateToUIScene`):
+  `ios/App/App/SceneDelegate.swift` now owns the window and root view controller and
+  forwards URL opens / universal links to `SceneDelegateProxy`; `AppDelegate` only
+  provides `configurationForConnecting`. iOS no longer calls the AppDelegate
+  `open url` / `continue userActivity` / foreground-background callbacks.
+- **The SceneDelegate root MUST stay `ViewController()`**, not the template's
+  `CAPBridgeViewController()`: that subclass is where the app-local plugins
+  (RestActivity, WidgetData, Health, CloudSync) are registered. The template default
+  silently drops all four with no crash.
+- Verify a native change on BOTH an iOS 27 and an iOS 26 simulator, polling the
+  process for >10s — "compiles" and "launches" are different claims here.
+
 ## Svelte gotchas (both have shipped real crashes)
 - `$state` objects are Proxies: `$state.snapshot()` before ANY IndexedDB write,
   structured clone, or native bridge call.
