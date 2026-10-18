@@ -195,8 +195,16 @@ PYEOF
 RESTORE_PBXPROJ=0
 echo "══ Committing the version bump"
 git add "$PBXPROJ"
-git commit -q -m "Build $BUILD_NUM" && git push -q origin main \
-	&& echo "   committed + pushed the build $BUILD_NUM bump" \
-	|| echo "   WARN: could not auto-commit/push the bump — commit $PBXPROJ manually."
+# Push HEAD, not the local `main` ref. Run from a worktree or any other branch,
+# `git push origin main` pushes a ref that does not contain this commit, exits 0,
+# and moves nothing — build 21 printed "committed + pushed" while GitHub had none
+# of its four commits. So push HEAD, then confirm GitHub actually has it instead of
+# trusting the exit code. (A non-fast-forward push fails safely into the WARN.)
+if git commit -q -m "Build $BUILD_NUM" && git push -q origin HEAD:main \
+	&& git fetch -q origin && [ "$(git rev-parse origin/main)" = "$(git rev-parse HEAD)" ]; then
+	echo "   committed + pushed the build $BUILD_NUM bump (origin/main = $(git rev-parse --short HEAD))"
+else
+	echo "   WARN: the bump is committed locally but is NOT on origin/main — run: git push origin HEAD:main"
+fi
 
 echo "══ DONE: $MARKETING ($BUILD_NUM) shipped, assigned, and the bump is committed."
