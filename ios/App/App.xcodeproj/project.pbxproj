@@ -27,13 +27,13 @@
 		6FEC1812431F33B5C10AFA7A /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */; };
 		7A03651CE701C09092AE7564 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF47E2123DCC97DDD4C1B9EF /* WidgetSnapshotStore.swift */; };
 		9DAD7ADC76258A8AD599F181 /* HealthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0413E4BF7B8FA6F07D6AB355 /* HealthPlugin.swift */; };
+		A378BEC7CD5740DD94B2B286 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A049CD00504CABBCC64B66 /* SceneDelegate.swift */; };
 		DBEEA10B69AF609034F73AE1 /* RestWidgetLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200C8B846BCFDA1D24AA123E /* RestWidgetLiveActivity.swift */; };
 		DF4F910C40A511B8EE9E21F0 /* RestWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3690937977D5F0454EAFB0D /* RestWidgetBundle.swift */; };
 		DFFE6D2DB4DB83788B8D9656 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24EB71C798823809720098CF /* ViewController.swift */; };
 		EBEA85E4D5A4C8901016BC40 /* RestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA10D2CFABAD36C4B01BA21 /* RestActivityAttributes.swift */; };
 		EEF134EDC73906B2EA631531 /* RestAdjustmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04F7DC7037BE6F1FC9BEFB0 /* RestAdjustmentStore.swift */; };
 		F74E5771E0A02710608AF937 /* CloudSyncPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84033E342C0F26A197A7292B /* CloudSyncPlugin.swift */; };
-		A378BEC7CD5740DD94B2B286 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A049CD00504CABBCC64B66 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -84,11 +84,11 @@
 		84033E342C0F26A197A7292B /* CloudSyncPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CloudSyncPlugin.swift; path = App/CloudSyncPlugin.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		A04F7DC7037BE6F1FC9BEFB0 /* RestAdjustmentStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestAdjustmentStore.swift; path = Shared/RestAdjustmentStore.swift; sourceTree = "<group>"; };
+		C8A049CD00504CABBCC64B66 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		DF47E2123DCC97DDD4C1B9EF /* WidgetSnapshotStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetSnapshotStore.swift; path = Shared/WidgetSnapshotStore.swift; sourceTree = "<group>"; };
 		F1723A7F107B929156A54C79 /* WidgetDataPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetDataPlugin.swift; path = App/WidgetDataPlugin.swift; sourceTree = "<group>"; };
 		F3690937977D5F0454EAFB0D /* RestWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RestWidgetBundle.swift; path = RestWidget/RestWidgetBundle.swift; sourceTree = "<group>"; };
 		F98DAF141CA78950AAA46AE3 /* BuffyHomeWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BuffyHomeWidget.swift; path = RestWidget/BuffyHomeWidget.swift; sourceTree = "<group>"; };
-		C8A049CD00504CABBCC64B66 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -460,7 +460,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = ZCS5Y23P62;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -487,7 +487,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = ZCS5Y23P62;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -514,7 +514,7 @@
 				CODE_SIGN_ENTITLEMENTS = RestWidget/RestWidget.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = ZCS5Y23P62;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RestWidget/Info.plist;
@@ -542,7 +542,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = RestWidget/RestWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = ZCS5Y23P62;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RestWidget/Info.plist;
