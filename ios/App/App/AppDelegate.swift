@@ -11,7 +11,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     // Scene lifecycle (Capacitor 8.5). An app built with the iOS 27 SDK MUST adopt it:
-    // UIKit traps at launch otherwise (EXC_BREAKPOINT inside
+    // UIKit traps about six seconds after launch otherwise (EXC_BREAKPOINT inside
     // UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption), which is what
     // every Xcode 27 build of this app did on iOS 27 until this landed. The window,
     // the root view controller, URL-scheme opens and universal links now live in

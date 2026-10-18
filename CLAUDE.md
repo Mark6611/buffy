@@ -40,8 +40,10 @@ Local-first: the canonical database is on-device IndexedDB; CloudKit is an opt-i
   `innerWidth`, never branch on orientation; let CSS reflow. Charts are
   `viewBox` + `width=100%` for this reason.
 - Verify with `node scripts/verify-duo-layout.mjs` after `npm run build:ios`.
-- The native side only sees these sizes once the app is built with the iOS 27.1 SDK
-  (Xcode 27.1+); an older SDK gets a phone-sized compatibility window on the Duo.
+- Per Apple's "Prepare your app for iPhone Duo" tech talk (NOT observed — Xcode 27.0 has
+  no Duo simulator): an app built with an iOS 26-or-older SDK gets a phone-sized
+  compatibility window on the Duo; the iOS 27.0 SDK lifts that (the app fills the inner
+  display minus the status-bar strip); the 27.1 SDK adds true edge-to-edge.
 
 ## iOS 27 SDK: the scene lifecycle is mandatory (shipped a launch crash in testing)
 - An app built with the iOS 27 SDK that has no `UIApplicationSceneManifest` is killed
@@ -50,14 +52,21 @@ Local-first: the canonical database is on-device IndexedDB; CloudKit is an opt-i
   linked-on-SDK gate: the same binary runs fine on iOS 26, and SDK-26 builds run fine
   on iOS 27 — so it only appears the first time you build with Xcode 27.
 - Buffy adopted it with Capacitor 8.5 (`npx cap migrate` → `migrateToUIScene`):
-  `ios/App/App/SceneDelegate.swift` now owns the window and root view controller and
-  forwards URL opens / universal links to `SceneDelegateProxy`; `AppDelegate` only
-  provides `configurationForConnecting`. iOS no longer calls the AppDelegate
-  `open url` / `continue userActivity` / foreground-background callbacks.
-- **The SceneDelegate root MUST stay `ViewController()`**, not the template's
-  `CAPBridgeViewController()`: that subclass is where the app-local plugins
-  (RestActivity, WidgetData, Health, CloudSync) are registered. The template default
-  silently drops all four with no crash.
+  `ios/App/App/SceneDelegate.swift` forwards scene connection, URL opens and universal
+  links to `SceneDelegateProxy`; `AppDelegate`'s only
+  scene-related job is `configurationForConnecting` (it keeps `didFinishLaunching` and
+  `applicationWillTerminate`, which iOS still calls). iOS no longer calls the
+  AppDelegate `open url` / `continue userActivity` / foreground-background callbacks.
+- **The window comes from `Main.storyboard`, not from code.** The scene manifest names
+  the storyboard (`UISceneStoryboardFile`), so UIKit builds the window — rooted at the
+  storyboard's `ViewController`, where the four app-local plugins (RestActivity,
+  WidgetData, Health, CloudSync) are registered — BEFORE `scene(_:willConnectTo:)` runs
+  (measured 2026-10-18: `window` was already set, root `ViewController`). The delegate
+  uses that window; a code fallback builds `ViewController()` only if the storyboard
+  key is ever removed. Do NOT adopt Capacitor's template body here: it builds a second
+  window with a plain `CAPBridgeViewController()`, which (a) silently drops all four
+  plugins and (b) leaves a discarded storyboard `ViewController` per launch — the
+  first version of this migration did (b).
 - Verify a native change on BOTH an iOS 27 and an iOS 26 simulator, polling the
   process for >10s — "compiles" and "launches" are different claims here.
 

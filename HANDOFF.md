@@ -11,7 +11,7 @@ against the repo, not estimated.
 | **App Store** | https://apps.apple.com/th/app/id6785999682 — listing **BuffUp**, home-screen name **Buffy**. The storefront-less URL 404s; the app is on the TH storefront. |
 | **Web** | https://buffy-six.vercel.app (also hosts the Whoop OAuth functions in `api/`) |
 | **Bundle / Team** | `com.mark.buffy` / `ZCS5Y23P62` · ASC app id `6785999682` |
-| **Live now** | 1.3 (build 19) · **1.4 (build 20) is `WAITING_FOR_REVIEW`**, auto-releases |
+| **Live now** | **1.4 (build 20)**, `READY_FOR_SALE` as of 2026-10-18. The next App Store version must be **1.5** |
 | **Size** | `src/` is 15.1k lines / 99 files (13.6k of it in `routes` + `lib`) · 277 unit tests · 2 E2E specs, 10 cases |
 
 What this app is: a **single-user, local-first** gym workout logger. The canonical
@@ -187,12 +187,19 @@ CI (`.github/workflows/ci.yml`) runs check + unit + build, and E2E in a second j
    viewport, so folding just reflows. `scripts/verify-duo-layout.mjs` is the gate.
 9. **Building with Xcode 27 crashed the app at launch on iOS 27 — the fix is in, keep
    it.** UIKit requires the UIScene lifecycle for apps built with the iOS 27 SDK and
-   traps otherwise (~6s in, SIGTRAP). Shipped SDK-26 builds were never affected (it is
-   a linked-on gate), so App Store users on iOS 27 were fine; every Xcode 27 build was
-   not. Adopted via Capacitor 8.5: `SceneDelegate.swift` owns the window; its root
-   **must remain `ViewController()`** — the template's `CAPBridgeViewController()`
-   silently drops all four app-local plugins. Verified on iOS 27.0 and 26.5
-   simulators by polling the process past 16s and seeing the home screen render.
+   traps otherwise (~6s in, SIGTRAP). Apple gates it on the SDK the app was built
+   with, so the shipped SDK-26 builds (19, 20) should be unaffected on iOS 27 — that is
+   inferred from Apple's wording plus the SDK-27 binary running fine on iOS 26.5, NOT
+   re-run on an iOS 27 simulator (no SDK-26 build exists on disk any more). Every
+   Xcode 27 build, by contrast, was dead on arrival. Adopted via Capacitor 8.5. The
+   window comes from `Main.storyboard` (UIKit builds it before the scene delegate runs,
+   rooted at `ViewController`, where the four app-local plugins are registered — the
+   same path every shipped build used); `SceneDelegate` only builds one in code as a
+   fallback. **Never adopt Capacitor's template body** there: it builds a second window
+   with a plain `CAPBridgeViewController()`, dropping all four plugins and orphaning the
+   storyboard's instance. Verified by measuring which path runs (a temporary probe:
+   window already set, root `ViewController`) and by polling the final build's process
+   well past the ~6s trap window on iOS 27.0 and 26.5, with the home screen rendered.
 
 ---
 
@@ -212,10 +219,17 @@ leave an **empty stuck draft submission** — delete it before retrying.
 
 ## 7. State of play
 
-**Done and live:** 1.0 through 1.3 on the App Store. 1.4 (build 20) submitted
-2026-09-07, `WAITING_FOR_REVIEW`, auto-releases. It fixes the picker search that live 1.3
-still ships broken, plus two other paren-drop sites, and prefills a mid-workout
-exercise's weight from your last session.
+**Done and live:** 1.0 through 1.4 on the App Store (1.4 confirmed `READY_FOR_SALE`
+2026-10-18). 1.4 fixed the picker search 1.3 shipped broken, plus two other paren-drop
+sites, and prefills a mid-workout exercise's weight from your last session.
+
+**Built but not shipped:** the iPhone Duo work — the web layer (`fb1d047`) and the iOS 27
+scene-lifecycle fix (trap 9). The next build containing them must be **1.5**: 1.4 is
+approved, so Apple rejects any further 1.4 upload (trap 3). **Ship it from a clean
+checkout, not `~/Desktop/buffy`:** that checkout carries uncommitted work-in-progress
+from September (session-edit conflict handling, backup-replace safety, ~18 files), and
+`scripts/ship.sh` builds whatever is in the working tree — it would put that unreviewed
+work on TestFlight. Commit or stash it first, or ship from a fresh worktree of `main`.
 
 **Open items:**
 
@@ -223,21 +237,29 @@ exercise's weight from your last session.
   layer is adapted and verified at the Duo's exact viewports (trap 8); the native shell
   now builds and launches on iOS 27 (trap 9, Capacitor 8.5.3, Xcode 27.0 installed
   2026-10); Duo screenshots exist in `appstore-screenshots-duo-outer/` (1398x2034) and
-  `-duo-inner/` (2007x2853). With the iOS 27.0 SDK the app already fills the Duo's
-  inner display minus the status-bar strip; true edge-to-edge needs the **27.1 SDK —
-  Xcode 27.1 is at Release Candidate** (Apple ID download) and Apple accepts Duo
-  submissions built with it. Open-and-turned to landscape (951pt) the column floats at
+  `-duo-inner/` (2007x2853). Per Apple's tech talk — not observed, Xcode 27.0 has no
+  Duo simulator — the iOS 27.0 SDK already fills the Duo's inner display minus the
+  status-bar strip; true edge-to-edge needs the **27.1 SDK — Xcode 27.1 is at Release
+  Candidate** (Apple ID download) and Apple accepts Duo submissions built with it. Open-and-turned to landscape (951pt) the column floats at
   440 like iPad — deliberate. ASC does not accept Duo screenshot uploads yet ("later
   this year") — `asc-screenshots.mjs` has the note. **Still unverified:** a `buffy://`
   URL-scheme open on iOS 27 (Whoop's OAuth return) — the scene path is Capacitor's own
   `SceneDelegateProxy`, but iOS's "Open in Buffy?" confirm needs a tap on the simulator
   that no session has had access to yet.
-- **The Apple Developer Program License Agreement was updated and is unaccepted —
-  nothing can ship until it is.** Every App Store Connect API call returns
-  `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`, so preflight, upload and
-  submission all fail before they start. Accept it at developer.apple.com/account →
-  "Review agreement" → **Agree** (the Account Holder, i.e. you — this is an Individual
-  enrollment). Not a code problem; an agent should not click a legal agreement.
+- **Status bar glyphs are invisible on every screen** (pre-existing since June, found
+  by the scene-lifecycle review, not fixed on that branch because `src/lib/native.ts`
+  is part of the uncommitted WIP on main). `setupNativeChrome()` calls
+  `StatusBar.setStyle({ style: Style.Dark })` with a comment saying "dark text" — the
+  Capacitor enum is the other way round: `Style.Dark` = light text for dark
+  backgrounds, so the clock, Wi-Fi and battery render white on the #faf8f4 paper.
+  One-line fix: `Style.Light` (or `Style.Default`), and fix the comment. Verify with a
+  screenshot of the status strip.
+- **If App Store Connect ever returns 403 `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`,**
+  Apple has updated the Developer Program License Agreement (it happened Oct 2026 and
+  blocked all shipping for ~2 weeks). It is accepted at developer.apple.com/account →
+  "Review agreement" → **Agree** — not in App Store Connect's Agreements page, which only
+  shows a banner. Only the Account Holder can do it; an agent should not click a legal
+  agreement.
 
 - **Dynamic Type has never had its on-device XXXL/AX pass**, though it is now live in
   1.3. If a version is ever rejected on layout, look there first.

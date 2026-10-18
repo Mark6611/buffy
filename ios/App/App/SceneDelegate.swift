@@ -7,13 +7,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        window = UIWindow(windowScene: windowScene)
-        // ViewController, NOT the base CAPBridgeViewController the template uses:
-        // it is where the app-local plugins (RestActivity, WidgetData, Health,
-        // CloudSync) are registered. The storyboard used to instantiate it; now that
-        // the window is built here, this line is the only thing that does.
-        window?.rootViewController = ViewController()
-        window?.makeKeyAndVisible()
+        // The scene manifest names Main.storyboard (UISceneStoryboardFile), so UIKit has
+        // ALREADY built the window by the time this runs — rooted at the storyboard's
+        // initial view controller, ViewController, the subclass that registers the four
+        // app-local plugins (RestActivity, WidgetData, Health, CloudSync). That is the
+        // same instantiation path every build before the scene lifecycle used. Use it.
+        //
+        // Capacitor's template instead builds a second window here with a plain
+        // CAPBridgeViewController(). That replaces the storyboard one, and the base
+        // class would silently drop all four plugins with no crash. Do not "restore" it.
+        //
+        // The fallback only runs if the storyboard key is ever removed from Info.plist.
+        if window == nil {
+            let fallback = UIWindow(windowScene: windowScene)
+            fallback.rootViewController = ViewController()
+            fallback.makeKeyAndVisible()
+            window = fallback
+        }
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
