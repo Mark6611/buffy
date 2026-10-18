@@ -172,6 +172,65 @@ try {
 		}
 		await ctx.close();
 	}
+
+	// ── Safe-area insets ────────────────────────────────────────────────────────
+	// Chromium reports every env(safe-area-inset-*) as 0, so nothing above can see
+	// how the side insets behave — which is how a regression slipped through: the
+	// insets were applied unconditionally, squeezing the centred 440pt column by
+	// ~118pt in iPhone landscape, where that column already clears the notch.
+	// Simulate real insets by rewriting env() in the built CSS as it is served,
+	// then read the computed padding the browser actually resolves.
+	console.log('\n── safe-area insets (env() rewritten in the served CSS)');
+	const INSET_CASES = [
+		// floating column: margins already clear the notch, so NO side padding
+		{ name: 'iphone-landscape', w: 932, h: 430, inset: { top: 0, right: 59, bottom: 21, left: 59 }, wantSide: { left: 0, right: 0 } },
+		// fill band, asymmetric: pad exactly the inset side, never mirror it
+		{ name: 'duo-outer-asym', w: 466, h: 678, inset: { top: 48, right: 28, bottom: 21, left: 0 }, wantSide: { left: 0, right: 28 } },
+		{ name: 'duo-split-asym', w: 334, h: 951, inset: { top: 48, right: 0, bottom: 21, left: 24 }, wantSide: { left: 24, right: 0 } }
+	];
+	for (const c of INSET_CASES) {
+		const ctx = await browser.newContext({ viewport: { width: c.w, height: c.h }, deviceScaleFactor: 2, colorScheme: 'light', serviceWorkers: 'block' });
+		await ctx.route('**/*.css', async (route) => {
+			const res = await route.fetch();
+			const css = (await res.text()).replace(
+				/env\(\s*safe-area-inset-(top|right|bottom|left)\s*(?:,[^)]*)?\)/g,
+				(_, side) => `${c.inset[side]}px`
+			);
+			await route.fulfill({ response: res, body: css });
+		});
+		const page = await ctx.newPage();
+		await page.goto(base + '/', { waitUntil: 'networkidle' });
+		await page.waitForTimeout(400);
+		const got = await page.evaluate(() => {
+			const px = (v) => parseFloat(v) || 0;
+			const screen = document.querySelector('.screen');
+			const s = screen ? getComputedStyle(screen) : null;
+			// the sheet only exists while open; a detached probe reads the same rules
+			const probe = document.createElement('div');
+			probe.className = 'sheet';
+			document.body.appendChild(probe);
+			const p = getComputedStyle(probe);
+			const out = {
+				screen: s ? { left: px(s.paddingLeft), right: px(s.paddingRight), width: screen.getBoundingClientRect().width } : null,
+				sheet: { left: px(p.paddingLeft), right: px(p.paddingRight) }
+			};
+			probe.remove();
+			return out;
+		});
+		const where = `insets ${c.name} ${c.w}×${c.h}`;
+		if (!got.screen) fail(where, 'no .screen on /');
+		else {
+			if (got.screen.left !== c.wantSide.left || got.screen.right !== c.wantSide.right)
+				fail(where, `.screen side padding ${got.screen.left}/${got.screen.right}px, expected ${c.wantSide.left}/${c.wantSide.right}px`);
+			// the sheet keeps its own 20px gutter and adds the same inset on top
+			const wantSheet = { left: 20 + c.wantSide.left, right: 20 + c.wantSide.right };
+			if (got.sheet.left !== wantSheet.left || got.sheet.right !== wantSheet.right)
+				fail(where, `.sheet side padding ${got.sheet.left}/${got.sheet.right}px, expected ${wantSheet.left}/${wantSheet.right}px`);
+		}
+		console.log(`   ${c.name.padEnd(17)} .screen L/R=${got.screen?.left}/${got.screen?.right} width=${got.screen?.width}  .sheet L/R=${got.sheet.left}/${got.sheet.right}`);
+		await page.screenshot({ path: join(OUT, `insets-${c.name}.png`) });
+		await ctx.close();
+	}
 } finally {
 	await browser.close();
 	server.close();
@@ -182,4 +241,4 @@ if (failures.length) {
 	console.log(`\n${failures.length} failure(s)`);
 	process.exit(1);
 }
-console.log('\nduo layout: all viewports and the fold transition pass');
+console.log('\nduo layout: all viewports, the fold transition and the safe-area insets pass');
