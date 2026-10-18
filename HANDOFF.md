@@ -146,6 +146,7 @@ npm run ios:open     # Xcode
 | `asc-api.mjs` | Minimal ASC REST client (ES256 JWT). `GET/POST/PATCH <path> [json]`. |
 | `asc-screenshots.mjs <locId> [--replace]` | Uploads the two screenshot sets. `--replace` is required for a new version, because ASC carries the old images forward. |
 | `gen-shots.mjs` | Regenerates all 12 App Store screenshots from a seeded production build. |
+| `verify-bundle-css.mjs` | Gates the BUILT CSS: no media range syntax, paired `backdrop-filter`, guarded `color-mix()`. Runs before every archive and in CI. |
 | `verify-*.mjs` | Accessibility gates: contrast, hit targets, semantics, Dynamic Type. `verify-duo-layout.mjs` drives the iPhone Duo's viewports and the fold transition (needs `npm run build:ios` first). |
 
 CI (`.github/workflows/ci.yml`) runs check + unit + build, and E2E in a second job.
@@ -183,8 +184,18 @@ CI (`.github/workflows/ci.yml`) runs check + unit + build, and E2E in a second j
    when the app is built with the **iOS 27.1 SDK (Xcode 27.1+)** — older SDKs get a
    phone-sized compatibility window. The web layer is ready: `.app` fills the viewport
    up to 700px and floats a 440px column above it; `.screen` and `.sheet` inset left and
-   right **independently** (the Duo's safe areas are asymmetric); nothing caches the
-   viewport, so folding just reflows. `scripts/verify-duo-layout.mjs` is the gate.
+   right **independently** (the Duo's safe areas are asymmetric) and **only in that
+   fill band** — above it the centred column clears any inset, and insetting there
+   squeezed iPhone landscape to ~322px. Nothing caches the viewport, so folding just
+   reflows. `scripts/verify-duo-layout.mjs` is the gate; it simulates insets by
+   rewriting `env()` in the served CSS, because Chromium reports them all as 0.
+10. **The minifier silently broke iOS 15–16.3.** Vite's Lightning CSS pass rewrote
+   `(max-width: …)` into range syntax `(width<=…)`, which Safari < 16.4 cannot parse —
+   so the input focus-zoom guard was off there in every build through 1.4, and the
+   `oklch()` colour tokens were invalid on iOS 15.0–15.3. Fixed by pinning
+   `build.cssTarget` to the iOS 15 floor (1.5 onward): range syntax is lowered and the
+   tokens gain hex fallbacks plus an `@supports` `lab()` layer, pixel-identical on
+   current iOS. `scripts/verify-bundle-css.mjs` gates every ship and CI run.
 9. **Building with Xcode 27 crashed the app at launch on iOS 27 — the fix is in, keep
    it.** UIKit requires the UIScene lifecycle for apps built with the iOS 27 SDK and
    traps otherwise (~6s in, SIGTRAP). Apple gates it on the SDK the app was built

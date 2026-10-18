@@ -35,7 +35,16 @@ Local-first: the canonical database is on-device IndexedDB; CloudKit is an opt-i
 - Safe areas: handle `env(safe-area-inset-left)` and `-right` SEPARATELY — the
   Duo's system controls sit down one edge of the inner display and which edge
   depends on pose and Split View placement. Backgrounds reach the screen edge;
-  content moves inside the insets (`.screen` and `.sheet` do this).
+  content moves inside the insets (`.screen` and `.sheet` do this). Apply the side
+  insets ONLY inside the 700px fill band: above it the centred column already clears
+  any inset, and applying them there squeezed the column to ~322px in iPhone
+  landscape. Chromium reports every inset as 0, so `verify-duo-layout.mjs` rewrites
+  `env()` in the served CSS to test this — keep that check.
+- The CSS build is pinned to the iOS 15 floor (`build.cssTarget` in vite.config.ts).
+  Without it Vite's Lightning CSS minifier rewrites `(max-width: 700px)` into range
+  syntax `(width<=700px)`, which Safari < 16.4 drops along with every rule inside.
+  It must be `build.cssTarget`, not `css.lightningcss.targets` (silently ignored).
+  `scripts/verify-bundle-css.mjs` gates the built bundle in the ship script and CI.
 - The Duo resizes the window continuously while folding: never cache
   `innerWidth`, never branch on orientation; let CSS reflow. Charts are
   `viewBox` + `width=100%` for this reason.

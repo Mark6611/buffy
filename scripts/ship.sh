@@ -111,6 +111,12 @@ echo "   building $MARKETING ($BUILD_NUM)"
 echo "══ Web bundle + native sync"
 npm run ios:sync > /tmp/ship-iossync.log 2>&1
 
+echo "══ Built-CSS floor (iOS 15: no media range syntax, paired backdrop-filter, guarded color-mix)"
+# Gates the bundle that is about to be archived, not the source: the minifier is what
+# rewrote (max-width) into range syntax iOS < 16.4 cannot parse, silently disabling
+# the input focus-zoom guard there. Exit 1 → set -e stops before the archive.
+node scripts/verify-bundle-css.mjs
+
 echo "══ Signed archive"
 rm -rf "$(dirname "$ARCHIVE")" "$EXPORT"
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
